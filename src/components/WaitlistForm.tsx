@@ -40,24 +40,54 @@ const WaitlistForm = () => {
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute -top-20 -right-20 w-80 h-80 bg-socratix-purple/10 rounded-full filter blur-3xl animate-pulse-glow" style={{ animationDuration: '8s' }} />
         <div className="absolute -bottom-20 -left-20 w-80 h-80 bg-socratix-teal/10 rounded-full filter blur-3xl animate-pulse-glow" style={{ animationDuration: '10s', animationDelay: '2s' }} />
+        
+        {/* Animated grid pattern */}
+        <div className="absolute inset-0 opacity-5">
+          <div className="h-full w-full" style={{
+            backgroundSize: '40px 40px',
+            backgroundImage: 'linear-gradient(to right, rgba(139, 92, 246, 0.3) 1px, transparent 1px), linear-gradient(to bottom, rgba(14, 165, 233, 0.3) 1px, transparent 1px)'
+          }}></div>
+        </div>
+        
+        {/* Animated particles */}
+        {[...Array(20)].map((_, i) => (
+          <div 
+            key={i}
+            className="absolute rounded-full bg-white/10 animate-float-subtle"
+            style={{
+              width: `${Math.random() * 6 + 2}px`,
+              height: `${Math.random() * 6 + 2}px`,
+              top: `${Math.random() * 100}%`,
+              left: `${Math.random() * 100}%`,
+              animationDelay: `${Math.random() * 5}s`,
+              animationDuration: `${Math.random() * 8 + 5}s`
+            }}
+          />
+        ))}
       </div>
       
       <div className="container px-4 mx-auto relative z-10">
         <div className="max-w-3xl mx-auto text-center">
-          <h2 className="text-3xl md:text-5xl font-bold mb-6 animate-on-scroll">
-            Join the <span className="animated-gradient-text">Waitlist</span>
+          <div className="mb-6 inline-block animate-on-scroll">
+            <div className="px-4 py-1 rounded-full bg-primary/10 text-primary text-sm font-semibold">
+              Join Us
+            </div>
+          </div>
+          
+          <h2 className="text-3xl md:text-5xl font-bold mb-6 animate-on-scroll font-display">
+            Join the <span className="animated-gradient-text-alt">Waitlist</span>
           </h2>
           <p className="text-lg md:text-xl text-muted-foreground mb-8 animate-on-scroll" style={{ transitionDelay: '0.1s' }}>
             Be among the first to experience the future of learning with Socratix.
             We'll notify you as soon as we're ready.
           </p>
 
-          <div className="glass-card p-8 md:p-12 animate-on-scroll advanced-card" style={{ transitionDelay: "0.2s" }}>
+          <div className="glass-card p-8 md:p-12 animate-on-scroll advanced-card shadow-soft" style={{ transitionDelay: "0.2s" }}>
             <div className="absolute w-full h-full inset-0">
               {[...Array(5)].map((_, i) => (
                 <div 
                   key={i}
-                  className="absolute w-1 h-10 bg-primary/10 animate-float"
+                  className="absolute w-1 h-10 bg-primary/10 animate-float-subtle"
                   style={{
                     left: `${Math.random() * 100}%`,
                     top: `${Math.random() * 100}%`,
@@ -78,15 +108,15 @@ const WaitlistForm = () => {
                   placeholder="Enter your email address"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="flex-1 focus:ring-2 focus:ring-primary/50 transition-all duration-300"
+                  className="flex-1 focus:ring-2 focus:ring-primary/50 transition-all duration-300 shadow-soft"
                   required
                 />
                 <Button 
                   type="submit" 
                   className="sm:w-auto relative overflow-hidden group" 
                   disabled={loading}
+                  variant="gradient"
                 >
-                  <span className="absolute inset-0 w-full h-full bg-gradient-to-r from-socratix-purple to-socratix-teal opacity-0 group-hover:opacity-20 transition-opacity duration-300" />
                   {loading ? (
                     <div className="flex items-center">
                       <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
