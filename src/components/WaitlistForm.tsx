@@ -35,30 +35,69 @@ const WaitlistForm = () => {
   };
 
   return (
-    <section id="waitlist" className="py-20 md:py-32 bg-muted/50">
-      <div className="container px-4 mx-auto">
+    <section id="waitlist" className="py-20 md:py-32 bg-muted/50 relative overflow-hidden">
+      {/* Background elements */}
+      <div className="absolute inset-0 overflow-hidden">
+        <div className="absolute -top-20 -right-20 w-80 h-80 bg-socratix-purple/10 rounded-full filter blur-3xl animate-pulse-glow" style={{ animationDuration: '8s' }} />
+        <div className="absolute -bottom-20 -left-20 w-80 h-80 bg-socratix-teal/10 rounded-full filter blur-3xl animate-pulse-glow" style={{ animationDuration: '10s', animationDelay: '2s' }} />
+      </div>
+      
+      <div className="container px-4 mx-auto relative z-10">
         <div className="max-w-3xl mx-auto text-center">
-          <h2 className="text-3xl md:text-4xl font-bold mb-6">
-            Join the <span className="gradient-text">Waitlist</span>
+          <h2 className="text-3xl md:text-5xl font-bold mb-6 animate-on-scroll">
+            Join the <span className="animated-gradient-text">Waitlist</span>
           </h2>
-          <p className="text-lg md:text-xl text-muted-foreground mb-8">
+          <p className="text-lg md:text-xl text-muted-foreground mb-8 animate-on-scroll" style={{ transitionDelay: '0.1s' }}>
             Be among the first to experience the future of learning with Socratix.
             We'll notify you as soon as we're ready.
           </p>
 
-          <div className="glass-card p-8 md:p-12">
-            <form onSubmit={handleSubmit} className="flex flex-col space-y-4">
+          <div className="glass-card p-8 md:p-12 animate-on-scroll advanced-card" style={{ transitionDelay: "0.2s" }}>
+            <div className="absolute w-full h-full inset-0">
+              {[...Array(5)].map((_, i) => (
+                <div 
+                  key={i}
+                  className="absolute w-1 h-10 bg-primary/10 animate-float"
+                  style={{
+                    left: `${Math.random() * 100}%`,
+                    top: `${Math.random() * 100}%`,
+                    opacity: Math.random() * 0.3 + 0.1,
+                    transform: `rotate(${Math.random() * 360}deg)`,
+                    filter: 'blur(2px)',
+                    animationDuration: `${Math.random() * 10 + 10}s`,
+                    animationDelay: `${Math.random() * 5}s`
+                  }}
+                />
+              ))}
+            </div>
+            
+            <form onSubmit={handleSubmit} className="flex flex-col space-y-4 relative z-10">
               <div className="flex flex-col sm:flex-row gap-4">
                 <Input
                   type="email"
                   placeholder="Enter your email address"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="flex-1"
+                  className="flex-1 focus:ring-2 focus:ring-primary/50 transition-all duration-300"
                   required
                 />
-                <Button type="submit" className="sm:w-auto" disabled={loading}>
-                  {loading ? "Joining..." : "Join Waitlist"}
+                <Button 
+                  type="submit" 
+                  className="sm:w-auto relative overflow-hidden group" 
+                  disabled={loading}
+                >
+                  <span className="absolute inset-0 w-full h-full bg-gradient-to-r from-socratix-purple to-socratix-teal opacity-0 group-hover:opacity-20 transition-opacity duration-300" />
+                  {loading ? (
+                    <div className="flex items-center">
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Joining...
+                    </div>
+                  ) : (
+                    "Join Waitlist"
+                  )}
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground">
@@ -66,6 +105,25 @@ const WaitlistForm = () => {
                 We'll never spam you or share your information.
               </p>
             </form>
+          </div>
+          
+          <div className="mt-12 animate-on-scroll" style={{ transitionDelay: '0.3s' }}>
+            <div className="flex items-center justify-center space-x-6">
+              <div className="flex flex-col items-center">
+                <div className="text-2xl font-bold text-primary mb-1">500+</div>
+                <div className="text-sm text-muted-foreground">Early Signups</div>
+              </div>
+              <div className="h-10 w-px bg-border"></div>
+              <div className="flex flex-col items-center">
+                <div className="text-2xl font-bold text-primary mb-1">92%</div>
+                <div className="text-sm text-muted-foreground">Satisfaction</div>
+              </div>
+              <div className="h-10 w-px bg-border"></div>
+              <div className="flex flex-col items-center">
+                <div className="text-2xl font-bold text-primary mb-1">8</div>
+                <div className="text-sm text-muted-foreground">Weeks to Launch</div>
+              </div>
+            </div>
           </div>
         </div>
       </div>

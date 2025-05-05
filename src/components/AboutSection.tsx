@@ -26,15 +26,44 @@ const AboutSection = () => {
   }, []);
 
   return (
-    <section id="about" ref={sectionRef} className="py-20 md:py-32 relative">
-      <div className="container px-4 mx-auto">
+    <section id="about" ref={sectionRef} className="py-20 md:py-32 relative overflow-hidden">
+      {/* Background decorative elements */}
+      <div className="absolute -top-40 -right-40 w-96 h-96 bg-socratix-purple/10 rounded-full filter blur-3xl" />
+      <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-socratix-teal/10 rounded-full filter blur-3xl" />
+      
+      <div className="absolute w-full h-full">
+        {[...Array(6)].map((_, i) => (
+          <div 
+            key={i}
+            className="absolute rounded-full animate-pulse-glow"
+            style={{
+              width: `${Math.random() * 300 + 100}px`,
+              height: `${Math.random() * 300 + 100}px`,
+              top: `${Math.random() * 100}%`,
+              left: `${Math.random() * 100}%`,
+              background: `radial-gradient(circle, ${
+                i % 3 === 0 ? 'rgba(139, 92, 246, 0.07)' : 
+                i % 3 === 1 ? 'rgba(14, 165, 233, 0.07)' : 
+                'rgba(217, 70, 239, 0.07)'
+              }, transparent)`,
+              animationDelay: `${i * 0.7}s`,
+              opacity: 0.8,
+            }}
+          />
+        ))}
+      </div>
+      
+      <div className="container px-4 mx-auto relative z-10">
         <div className="max-w-4xl mx-auto text-center">
-          <h2 className="text-3xl md:text-4xl font-bold mb-8 animate-on-scroll">
-            What is <span className="gradient-text">Socratix</span>?
+          <h2 className="text-3xl md:text-5xl font-bold mb-8 animate-on-scroll relative inline-block">
+            What is <span className="animated-gradient-text">Socratix</span>?
+            <span className="absolute -z-10 inset-0 bg-primary/5 blur-3xl rounded-full"></span>
           </h2>
           
-          <div className="glass-card p-8 md:p-12 animate-on-scroll" style={{ transitionDelay: "0.2s" }}>
-            <p className="text-xl md:text-2xl font-medium mb-6">
+          <div className="glass-card p-8 md:p-12 animate-on-scroll advanced-card" style={{ transitionDelay: "0.2s" }}>
+            <div className="absolute -z-10 w-full h-full inset-0 bg-gradient-radial from-primary/5 to-transparent opacity-50 animate-pulse-glow" style={{ animationDuration: '8s' }} />
+            
+            <p className="text-xl md:text-3xl font-medium mb-6">
               An AI tutor that teaches by asking, not telling.
             </p>
             <p className="text-base md:text-lg text-muted-foreground">
@@ -46,8 +75,9 @@ const AboutSection = () => {
           </div>
           
           <div className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="glass-card p-6 animate-on-scroll" style={{ transitionDelay: "0.3s" }}>
-              <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center mb-4 mx-auto">
+            <div className="glass-card p-6 animate-on-scroll relative group" style={{ transitionDelay: "0.3s" }}>
+              <div className="absolute inset-0 bg-gradient-to-r from-socratix-purple/0 via-socratix-purple/5 to-socratix-purple/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+              <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center mb-4 mx-auto group-hover:scale-110 transition-transform duration-300">
                 <svg className="w-8 h-8 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
@@ -58,8 +88,9 @@ const AboutSection = () => {
               </p>
             </div>
             
-            <div className="glass-card p-6 animate-on-scroll" style={{ transitionDelay: "0.4s" }}>
-              <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center mb-4 mx-auto">
+            <div className="glass-card p-6 animate-on-scroll relative group" style={{ transitionDelay: "0.4s" }}>
+              <div className="absolute inset-0 bg-gradient-to-r from-socratix-teal/0 via-socratix-teal/5 to-socratix-teal/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+              <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center mb-4 mx-auto group-hover:scale-110 transition-transform duration-300">
                 <svg className="w-8 h-8 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                 </svg>
@@ -70,8 +101,9 @@ const AboutSection = () => {
               </p>
             </div>
             
-            <div className="glass-card p-6 animate-on-scroll" style={{ transitionDelay: "0.5s" }}>
-              <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center mb-4 mx-auto">
+            <div className="glass-card p-6 animate-on-scroll relative group" style={{ transitionDelay: "0.5s" }}>
+              <div className="absolute inset-0 bg-gradient-to-r from-socratix-pink/0 via-socratix-pink/5 to-socratix-pink/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+              <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center mb-4 mx-auto group-hover:scale-110 transition-transform duration-300">
                 <svg className="w-8 h-8 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
                 </svg>

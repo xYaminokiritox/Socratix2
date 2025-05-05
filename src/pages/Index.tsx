@@ -23,7 +23,7 @@ const Index = () => {
         const windowHeight = window.innerHeight;
         
         // If element is in viewport
-        if (elementTop + elementHeight * 0.3 <= windowHeight) {
+        if (elementTop + elementHeight * 0.2 <= windowHeight) {
           el.classList.add("visible");
         }
       });
@@ -31,14 +31,14 @@ const Index = () => {
     
     window.addEventListener("scroll", handleScroll);
     // Trigger once on initial load
-    handleScroll();
+    setTimeout(handleScroll, 100);
     
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
   return (
     <ThemeProvider defaultTheme="light">
-      <div className="min-h-screen">
+      <div className="min-h-screen overflow-hidden">
         <Header />
         <Hero />
         <AboutSection />

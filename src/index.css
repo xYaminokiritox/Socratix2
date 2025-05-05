@@ -17,7 +17,7 @@
     --primary: 260 73% 52%;
     --primary-foreground: 210 40% 98%;
 
-    --secondary: 186 64% 39%;
+    --secondary: 196 80% 45%;
     --secondary-foreground: 222 47% 11%;
 
     --muted: 210 40% 96%;
@@ -33,7 +33,7 @@
     --input: 214 32% 91%;
     --ring: 222 47% 11%;
 
-    --radius: 0.75rem;
+    --radius: 1rem;
 
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5% 26%;
@@ -58,7 +58,7 @@
     --primary: 260 73% 52%;
     --primary-foreground: 210 40% 98%;
 
-    --secondary: 186 64% 39%;
+    --secondary: 196 80% 45%;
     --secondary-foreground: 210 40% 98%;
 
     --muted: 217 33% 17%;
@@ -87,7 +87,7 @@
 
 @layer base {
   * {
-    @apply border-border;
+    @apply border-border selection:bg-primary/10 selection:text-primary;
   }
 
   body {
@@ -100,31 +100,68 @@
   }
 
   .glass-card {
-    @apply bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl shadow-xl;
+    @apply bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl shadow-xl transition-all duration-300 hover:shadow-2xl hover:border-white/30;
   }
 
   .dark .glass-card {
-    @apply bg-black/30 border-white/10;
+    @apply bg-black/30 border-white/10 hover:border-white/20;
   }
 
   .gradient-text {
-    @apply bg-gradient-to-r from-socratix-purple to-socratix-teal text-transparent bg-clip-text;
+    @apply bg-gradient-to-r from-socratix-purple to-socratix-teal text-transparent bg-clip-text drop-shadow-sm;
+  }
+  
+  .animated-gradient-text {
+    @apply bg-gradient-to-r from-socratix-purple via-socratix-teal to-socratix-pink bg-size-200 text-transparent bg-clip-text animate-shimmer;
+    background-size: 200% 100%;
+  }
+  
+  .glow-effect {
+    @apply relative;
+  }
+  
+  .glow-effect::after {
+    @apply content-[''] absolute -inset-1 rounded-lg bg-gradient-to-r from-socratix-purple to-socratix-teal blur-xl opacity-30 -z-10 transition-all duration-300;
+  }
+  
+  .glow-effect:hover::after {
+    @apply opacity-50 blur-xl;
   }
   
   .animate-on-scroll {
     opacity: 0;
     transform: translateY(30px);
-    transition: opacity 0.6s, transform 0.6s;
+    transition: opacity 0.8s, transform 0.8s;
   }
 
   .animate-on-scroll.visible {
     opacity: 1;
     transform: translateY(0);
   }
+  
+  .floating-element {
+    @apply animate-float;
+  }
 }
 
 .scroll-down-indicator {
   animation: bounce 2s infinite;
+}
+
+.advanced-card {
+  @apply relative overflow-hidden z-10 transition-all duration-300;
+}
+
+.advanced-card:before {
+  @apply content-[''] absolute -inset-1 bg-gradient-to-r from-socratix-purple via-socratix-teal to-socratix-pink blur-md -z-10 opacity-0 transition-opacity duration-300;
+}
+
+.advanced-card:hover:before {
+  @apply opacity-70;
+}
+
+.bg-size-200 {
+  background-size: 200% 200%;
 }
 
 @keyframes bounce {
