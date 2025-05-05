@@ -10,16 +10,16 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90 shadow-soft hover:shadow-glow hover:-translate-y-0.5",
+        default: "bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm hover:shadow-md hover:-translate-y-0.5",
         destructive:
-          "bg-destructive text-destructive-foreground hover:bg-destructive/90 shadow-soft hover:-translate-y-0.5",
+          "bg-destructive text-destructive-foreground hover:bg-destructive/90 shadow-sm hover:-translate-y-0.5",
         outline:
-          "border border-input bg-background hover:bg-accent hover:text-accent-foreground shadow-soft hover:-translate-y-0.5",
+          "border border-input bg-background hover:bg-accent hover:text-accent-foreground shadow-sm hover:-translate-y-0.5",
         secondary:
-          "bg-secondary text-secondary-foreground hover:bg-secondary/80 shadow-soft hover:shadow-glow-teal hover:-translate-y-0.5",
+          "bg-secondary text-secondary-foreground hover:bg-secondary/80 shadow-sm hover:-translate-y-0.5",
         ghost: "hover:bg-accent hover:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline",
-        gradient: "relative overflow-hidden shadow-soft hover:shadow-glow hover:-translate-y-0.5 before:absolute before:inset-0 before:bg-gradient-to-r before:from-socratix-purple before:to-socratix-teal before:opacity-100 hover:before:opacity-80 before:transition-opacity [&>span]:relative [&>span]:z-10 text-white",
+        gradient: "relative overflow-hidden shadow-sm hover:shadow-md hover:-translate-y-0.5 before:absolute before:inset-0 before:bg-gradient-to-r before:from-socratix-purple before:to-socratix-teal before:opacity-100 before:transition-opacity [&>span]:relative [&>span]:z-10 text-white",
       },
       size: {
         default: "h-10 px-4 py-2",

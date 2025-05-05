@@ -36,27 +36,27 @@ const WaitlistForm = () => {
 
   return (
     <section id="waitlist" className="py-20 md:py-32 bg-muted/50 relative overflow-hidden">
-      {/* Background elements */}
+      {/* Refined background elements */}
       <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -top-20 -right-20 w-80 h-80 bg-socratix-purple/10 rounded-full filter blur-3xl animate-pulse-glow" style={{ animationDuration: '8s' }} />
-        <div className="absolute -bottom-20 -left-20 w-80 h-80 bg-socratix-teal/10 rounded-full filter blur-3xl animate-pulse-glow" style={{ animationDuration: '10s', animationDelay: '2s' }} />
+        <div className="absolute -top-20 -right-20 w-80 h-80 bg-socratix-purple/5 rounded-full filter blur-3xl" />
+        <div className="absolute -bottom-20 -left-20 w-80 h-80 bg-socratix-teal/5 rounded-full filter blur-3xl" />
         
-        {/* Animated grid pattern */}
-        <div className="absolute inset-0 opacity-5">
+        {/* Subtle grid pattern */}
+        <div className="absolute inset-0 opacity-3">
           <div className="h-full w-full" style={{
             backgroundSize: '40px 40px',
-            backgroundImage: 'linear-gradient(to right, rgba(139, 92, 246, 0.3) 1px, transparent 1px), linear-gradient(to bottom, rgba(14, 165, 233, 0.3) 1px, transparent 1px)'
+            backgroundImage: 'linear-gradient(to right, rgba(139, 92, 246, 0.03) 1px, transparent 1px), linear-gradient(to bottom, rgba(14, 165, 233, 0.03) 1px, transparent 1px)'
           }}></div>
         </div>
         
-        {/* Animated particles */}
-        {[...Array(20)].map((_, i) => (
+        {/* Subtle floating particles */}
+        {[...Array(10)].map((_, i) => (
           <div 
             key={i}
-            className="absolute rounded-full bg-white/10 animate-float-subtle"
+            className="absolute rounded-full bg-white/5 animate-float-subtle"
             style={{
-              width: `${Math.random() * 6 + 2}px`,
-              height: `${Math.random() * 6 + 2}px`,
+              width: `${Math.random() * 4 + 2}px`,
+              height: `${Math.random() * 4 + 2}px`,
               top: `${Math.random() * 100}%`,
               left: `${Math.random() * 100}%`,
               animationDelay: `${Math.random() * 5}s`,
@@ -82,25 +82,7 @@ const WaitlistForm = () => {
             We'll notify you as soon as we're ready.
           </p>
 
-          <div className="glass-card p-8 md:p-12 animate-on-scroll advanced-card shadow-soft" style={{ transitionDelay: "0.2s" }}>
-            <div className="absolute w-full h-full inset-0">
-              {[...Array(5)].map((_, i) => (
-                <div 
-                  key={i}
-                  className="absolute w-1 h-10 bg-primary/10 animate-float-subtle"
-                  style={{
-                    left: `${Math.random() * 100}%`,
-                    top: `${Math.random() * 100}%`,
-                    opacity: Math.random() * 0.3 + 0.1,
-                    transform: `rotate(${Math.random() * 360}deg)`,
-                    filter: 'blur(2px)',
-                    animationDuration: `${Math.random() * 10 + 10}s`,
-                    animationDelay: `${Math.random() * 5}s`
-                  }}
-                />
-              ))}
-            </div>
-            
+          <div className="glass-card p-8 md:p-12 animate-on-scroll shadow-sm hover:shadow-md transition-all duration-300" style={{ transitionDelay: "0.2s" }}>
             <form onSubmit={handleSubmit} className="flex flex-col space-y-4 relative z-10">
               <div className="flex flex-col sm:flex-row gap-4">
                 <Input
@@ -108,7 +90,7 @@ const WaitlistForm = () => {
                   placeholder="Enter your email address"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="flex-1 focus:ring-2 focus:ring-primary/50 transition-all duration-300 shadow-soft"
+                  className="flex-1 focus:ring-2 focus:ring-primary/50 transition-all duration-300 shadow-sm"
                   required
                 />
                 <Button 

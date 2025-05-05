@@ -48,15 +48,19 @@ const Index = () => {
   return (
     <ThemeProvider defaultTheme="light">
       <div className="min-h-screen overflow-hidden relative">
-        {/* Scroll progress indicator */}
+        {/* Refined scroll progress indicator */}
         <div 
-          className="fixed top-0 left-0 h-1 bg-gradient-to-r from-socratix-purple via-socratix-teal to-socratix-pink z-50"
-          style={{ width: `${scrollProgress}%`, transition: 'width 0.1s' }}
+          className="fixed top-0 left-0 h-1 bg-gradient-to-r from-socratix-purple to-socratix-teal z-50"
+          style={{ 
+            width: `${scrollProgress}%`, 
+            transition: 'width 0.3s ease',
+            opacity: 0.9
+          }}
         />
         
-        {/* Fixed decorative elements */}
-        <div className="fixed inset-0 pointer-events-none z-[-1] opacity-20">
-          <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_50%_50%,rgba(139,92,246,0.1),transparent_60%)]"></div>
+        {/* Subtle decorative element - more refined */}
+        <div className="fixed inset-0 pointer-events-none z-[-1] opacity-10">
+          <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_50%_50%,rgba(139,92,246,0.05),transparent_70%)]"></div>
         </div>
         
         <Header />
