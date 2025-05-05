@@ -19,7 +19,7 @@ const buttonVariants = cva(
           "bg-secondary text-secondary-foreground hover:bg-secondary/80 shadow-sm hover:-translate-y-0.5",
         ghost: "hover:bg-accent hover:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline",
-        gradient: "relative overflow-hidden shadow-sm hover:shadow-md hover:-translate-y-0.5 before:absolute before:inset-0 before:bg-gradient-to-r before:from-socratix-purple before:to-socratix-teal before:opacity-100 before:transition-opacity [&>span]:relative [&>span]:z-10 text-white",
+        gradient: "relative overflow-hidden shadow-sm hover:shadow-md hover:-translate-y-0.5 before:absolute before:inset-0 before:bg-gradient-to-r before:from-socratix-purple before:to-socratix-teal before:opacity-90 before:transition-all hover:before:opacity-100 [&>span]:relative [&>span]:z-10 text-white",
       },
       size: {
         default: "h-10 px-4 py-2",

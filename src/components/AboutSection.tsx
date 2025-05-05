@@ -27,25 +27,12 @@ const AboutSection = () => {
 
   return (
     <section id="about" ref={sectionRef} className="py-20 md:py-32 relative overflow-hidden">
-      {/* Decorative background elements */}
-      <div className="absolute top-0 left-0 w-full h-full">
-        <div className="absolute top-0 left-0 w-full h-full">
-          <svg 
-            viewBox="0 0 100 100" 
-            preserveAspectRatio="none"
-            className="absolute top-0 left-0 w-full h-full opacity-10"
-          >
-            <defs>
-              <radialGradient id="gradient" cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
-                <stop offset="0%" stopColor="var(--socratix-purple)" stopOpacity="0.3" />
-                <stop offset="100%" stopColor="var(--socratix-teal)" stopOpacity="0" />
-              </radialGradient>
-            </defs>
-            <circle cx="50" cy="50" r="40" fill="url(#gradient)" />
-          </svg>
-        </div>
+      {/* Improved subtle background elements */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden">
+        {/* Soft gradient background */}
+        <div className="absolute inset-0 bg-gradient-radial from-primary/5 to-transparent opacity-30"></div>
         
-        {/* Animated grid pattern */}
+        {/* Subtle grid pattern */}
         <div className="absolute inset-0 opacity-5">
           <div className="h-full w-full" style={{
             backgroundSize: '30px 30px',
@@ -53,23 +40,22 @@ const AboutSection = () => {
           }}></div>
         </div>
         
-        {/* Floating elements */}
-        {[...Array(6)].map((_, i) => (
+        {/* Soft accent circles - reduced number and subtlety */}
+        {[...Array(3)].map((_, i) => (
           <div 
             key={i}
-            className="absolute rounded-full animate-pulse-glow"
+            className="absolute rounded-full"
             style={{
-              width: `${Math.random() * 300 + 100}px`,
-              height: `${Math.random() * 300 + 100}px`,
+              width: `${Math.random() * 200 + 100}px`,
+              height: `${Math.random() * 200 + 100}px`,
               top: `${Math.random() * 100}%`,
               left: `${Math.random() * 100}%`,
               background: `radial-gradient(circle, ${
-                i % 3 === 0 ? 'rgba(139, 92, 246, 0.07)' : 
-                i % 3 === 1 ? 'rgba(14, 165, 233, 0.07)' : 
-                'rgba(217, 70, 239, 0.07)'
-              }, transparent)`,
-              animationDelay: `${i * 0.7}s`,
-              opacity: 0.8,
+                i % 3 === 0 ? 'rgba(139, 92, 246, 0.03)' : 
+                i % 3 === 1 ? 'rgba(14, 165, 233, 0.02)' : 
+                'rgba(217, 70, 239, 0.03)'
+              }, transparent 70%)`,
+              opacity: 0.5,
             }}
           />
         ))}
@@ -88,9 +74,7 @@ const AboutSection = () => {
             <span className="absolute -z-10 inset-0 bg-primary/5 blur-3xl rounded-full"></span>
           </h2>
           
-          <div className="glass-card p-8 md:p-12 animate-on-scroll advanced-card ripple-bg" style={{ transitionDelay: "0.2s" }}>
-            <div className="absolute -z-10 w-full h-full inset-0 bg-gradient-radial from-primary/5 to-transparent opacity-50 animate-pulse-glow" style={{ animationDuration: '8s' }} />
-            
+          <div className="glass-card p-8 md:p-12 animate-on-scroll advanced-card" style={{ transitionDelay: "0.2s" }}>
             <p className="text-xl md:text-3xl font-medium mb-6 font-display">
               An AI tutor that teaches by asking, not telling.
             </p>
