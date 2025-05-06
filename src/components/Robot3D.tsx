@@ -1,8 +1,9 @@
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, Suspense } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, Environment, PresentationControls } from '@react-three/drei';
 import * as THREE from 'three';
+import { ErrorBoundary } from 'react-error-boundary';
 
 // Simple Robot component
 function Robot(props: any) {
@@ -170,8 +171,21 @@ function Robot(props: any) {
   );
 }
 
+// Fallback component to display when 3D rendering fails
+function FallbackComponent() {
+  return (
+    <div className="flex items-center justify-center h-full w-full flex-col">
+      <div className="text-2xl font-bold text-primary mb-4">3D Rendering Error</div>
+      <p className="text-center text-muted-foreground">
+        Could not initialize the 3D viewer. Please try refreshing the page.
+      </p>
+    </div>
+  );
+}
+
 const Robot3D = () => {
   const [isDragging, setIsDragging] = useState(false);
+  const [renderFallback, setRenderFallback] = useState(false);
   
   // Set up pointer event listeners to track dragging state
   useEffect(() => {
@@ -194,29 +208,48 @@ const Robot3D = () => {
     };
   }, []);
   
+  // Error handler for the ErrorBoundary
+  const handleError = (error: Error) => {
+    console.error("Error in 3D rendering:", error);
+    setRenderFallback(true);
+  };
+  
   return (
-    <div className="h-[400px] md:h-[500px] w-full bg-gradient-to-r from-background to-muted/30 rounded-xl overflow-hidden">
-      <Canvas
-        camera={{ position: [0, 0, 5], fov: 40 }}
-        className="cursor-grab active:cursor-grabbing"
-        shadows
-        dpr={[1, 2]}
-      >
-        <Environment preset="city" />
-        <ambientLight intensity={0.5} />
-        <spotLight position={[10, 10, 10]} angle={0.15} penumbra={1} intensity={1} castShadow />
-        <PresentationControls
-          global
-          rotation={[0.13, 0.1, 0]}
-          polar={[-0.4, 0.2]}
-          azimuth={[-0.5, 0.5]}
-          config={{ mass: 2, tension: 400 }}
-          snap={{ mass: 4, tension: 400 }}
-          // Removed problematic props completely - we're using window events instead
-        >
-          <Robot isDragging={isDragging} position={[0, -1, 0]} />
-        </PresentationControls>
-      </Canvas>
+    <div className="h-[400px] md:h-[500px] w-full bg-gradient-to-r from-background to-muted/30 rounded-xl overflow-hidden relative">
+      {renderFallback ? (
+        <FallbackComponent />
+      ) : (
+        <ErrorBoundary FallbackComponent={FallbackComponent} onError={handleError}>
+          <Canvas
+            camera={{ position: [0, 0, 5], fov: 40 }}
+            className="cursor-grab active:cursor-grabbing"
+            shadows
+            dpr={[1, 2]}
+            gl={{ 
+              antialias: true,
+              alpha: true,
+              powerPreference: 'high-performance',
+            }}
+          >
+            <Suspense fallback={null}>
+              <Environment preset="city" />
+              <ambientLight intensity={0.5} />
+              <spotLight position={[10, 10, 10]} angle={0.15} penumbra={1} intensity={1} castShadow />
+              <PresentationControls
+                global
+                rotation={[0.13, 0.1, 0]}
+                polar={[-0.4, 0.2]}
+                azimuth={[-0.5, 0.5]}
+                config={{ mass: 2, tension: 400 }}
+                snap={{ mass: 4, tension: 400 }}
+                // We're using window events instead of props
+              >
+                <Robot isDragging={isDragging} position={[0, -1, 0]} />
+              </PresentationControls>
+            </Suspense>
+          </Canvas>
+        </ErrorBoundary>
+      )}
       <div className="absolute bottom-4 left-0 right-0 text-center text-muted-foreground text-sm">
         Drag to interact with Socratix Assistant
       </div>
