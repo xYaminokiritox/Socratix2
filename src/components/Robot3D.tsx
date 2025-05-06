@@ -173,6 +173,27 @@ function Robot(props: any) {
 const Robot3D = () => {
   const [isDragging, setIsDragging] = useState(false);
   
+  // Set up pointer event listeners to track dragging state
+  useEffect(() => {
+    const handlePointerDown = () => {
+      setIsDragging(true);
+    };
+    
+    const handlePointerUp = () => {
+      setIsDragging(false);
+    };
+    
+    // Add global event listeners
+    window.addEventListener('pointerdown', handlePointerDown);
+    window.addEventListener('pointerup', handlePointerUp);
+    
+    // Clean up
+    return () => {
+      window.removeEventListener('pointerdown', handlePointerDown);
+      window.removeEventListener('pointerup', handlePointerUp);
+    };
+  }, []);
+  
   return (
     <div className="h-[400px] md:h-[500px] w-full bg-gradient-to-r from-background to-muted/30 rounded-xl overflow-hidden">
       <Canvas
@@ -191,9 +212,7 @@ const Robot3D = () => {
           azimuth={[-0.5, 0.5]}
           config={{ mass: 2, tension: 400 }}
           snap={{ mass: 4, tension: 400 }}
-          // Remove the onDragStart and onDragEnd props that cause the TypeScript error
-          // Instead, use the onChange prop to detect when the control is being dragged
-          onChange={({ active }) => setIsDragging(active)}
+          // Removed problematic props completely - we're using window events instead
         >
           <Robot isDragging={isDragging} position={[0, -1, 0]} />
         </PresentationControls>
