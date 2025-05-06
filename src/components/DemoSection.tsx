@@ -1,5 +1,6 @@
 
 import { Button } from "@/components/ui/button";
+import { Link } from "react-router-dom";
 import Robot3D from "./Robot3D";
 
 const DemoSection = () => {
@@ -44,8 +45,8 @@ const DemoSection = () => {
                 </div>
               </div>
               <div className="mt-8">
-                <Button variant="gradient" className="mr-4">
-                  <span>Try Demo</span>
+                <Button variant="gradient" className="mr-4" asChild>
+                  <Link to="/demo">Try Demo</Link>
                 </Button>
                 <Button variant="outline">Learn More</Button>
               </div>
