@@ -1,8 +1,7 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowUp } from "lucide-react";
+import { ArrowUp, Book } from "lucide-react";
 
 interface NotesUploaderProps {
   onNotesUploaded: (notes: string) => void;
