@@ -191,8 +191,9 @@ const Robot3D = () => {
           azimuth={[-0.5, 0.5]}
           config={{ mass: 2, tension: 400 }}
           snap={{ mass: 4, tension: 400 }}
-          onDragStart={() => setIsDragging(true)}
-          onDragEnd={() => setIsDragging(false)}
+          // Remove the onDragStart and onDragEnd props that cause the TypeScript error
+          // Instead, use the onChange prop to detect when the control is being dragged
+          onChange={({ active }) => setIsDragging(active)}
         >
           <Robot isDragging={isDragging} position={[0, -1, 0]} />
         </PresentationControls>
