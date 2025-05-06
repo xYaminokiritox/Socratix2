@@ -1,7 +1,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { OrbitControls, useGLTF, Environment, PresentationControls } from '@react-three/drei';
+import { OrbitControls, Environment, PresentationControls } from '@react-three/drei';
 import * as THREE from 'three';
 
 // Simple Robot component
@@ -43,21 +43,37 @@ function Robot(props: any) {
         {/* Robot Eyes */}
         <mesh position={[0.2, 0.1, 0.38]} scale={[0.15, 0.15, 0.1]}>
           <sphereGeometry />
-          <meshStandardMaterial color="#0EA5E9" emissive="#0EA5E9" emissiveIntensity={2} />
+          <meshStandardMaterial 
+            color="#0EA5E9" 
+            emissive="#0EA5E9" 
+            emissiveIntensity={2} 
+          />
         </mesh>
         <mesh position={[-0.2, 0.1, 0.38]} scale={[0.15, 0.15, 0.1]}>
           <sphereGeometry />
-          <meshStandardMaterial color="#0EA5E9" emissive="#0EA5E9" emissiveIntensity={2} />
+          <meshStandardMaterial 
+            color="#0EA5E9" 
+            emissive="#0EA5E9" 
+            emissiveIntensity={2} 
+          />
         </mesh>
         
         {/* Robot Antenna */}
         <mesh position={[0, 0.5, 0]} scale={[0.05, 0.3, 0.05]}>
           <cylinderGeometry />
-          <meshStandardMaterial color="#E5DEFF" metalness={0.8} roughness={0.2} />
+          <meshStandardMaterial 
+            color="#E5DEFF" 
+            metalness={0.8} 
+            roughness={0.2} 
+          />
         </mesh>
         <mesh position={[0, 0.7, 0]} scale={[0.1, 0.1, 0.1]}>
           <sphereGeometry />
-          <meshStandardMaterial color="#F97316" emissive="#F97316" emissiveIntensity={1} />
+          <meshStandardMaterial 
+            color="#F97316" 
+            emissive="#F97316" 
+            emissiveIntensity={1} 
+          />
         </mesh>
       </mesh>
       
@@ -94,7 +110,11 @@ function Robot(props: any) {
       {/* Robot Arms */}
       <mesh position={[0.6, 0.5, 0]} rotation={[0, 0, -Math.PI / 4]}>
         <boxGeometry args={[0.2, 0.6, 0.2]} />
-        <meshStandardMaterial color="#6E59A5" metalness={0.7} roughness={0.3} />
+        <meshStandardMaterial 
+          color="#6E59A5" 
+          metalness={0.7} 
+          roughness={0.3} 
+        />
         
         {/* Robot Hand */}
         <mesh position={[0, -0.4, 0]} scale={[0.3, 0.2, 0.3]}>
@@ -104,7 +124,11 @@ function Robot(props: any) {
       </mesh>
       <mesh position={[-0.6, 0.5, 0]} rotation={[0, 0, Math.PI / 4]}>
         <boxGeometry args={[0.2, 0.6, 0.2]} />
-        <meshStandardMaterial color="#6E59A5" metalness={0.7} roughness={0.3} />
+        <meshStandardMaterial 
+          color="#6E59A5" 
+          metalness={0.7} 
+          roughness={0.3} 
+        />
         
         {/* Robot Hand */}
         <mesh position={[0, -0.4, 0]} scale={[0.3, 0.2, 0.3]}>
@@ -116,7 +140,11 @@ function Robot(props: any) {
       {/* Robot Legs */}
       <mesh position={[0.3, -0.3, 0]}>
         <boxGeometry args={[0.25, 0.8, 0.3]} />
-        <meshStandardMaterial color="#6E59A5" metalness={0.6} roughness={0.3} />
+        <meshStandardMaterial 
+          color="#6E59A5" 
+          metalness={0.6} 
+          roughness={0.3} 
+        />
         
         {/* Robot Foot */}
         <mesh position={[0, -0.5, 0.1]} scale={[0.3, 0.2, 0.5]}>
@@ -126,7 +154,11 @@ function Robot(props: any) {
       </mesh>
       <mesh position={[-0.3, -0.3, 0]}>
         <boxGeometry args={[0.25, 0.8, 0.3]} />
-        <meshStandardMaterial color="#6E59A5" metalness={0.6} roughness={0.3} />
+        <meshStandardMaterial 
+          color="#6E59A5" 
+          metalness={0.6} 
+          roughness={0.3} 
+        />
         
         {/* Robot Foot */}
         <mesh position={[0, -0.5, 0.1]} scale={[0.3, 0.2, 0.5]}>
