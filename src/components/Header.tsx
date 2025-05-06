@@ -3,11 +3,13 @@ import { Button } from "@/components/ui/button";
 import { useTheme } from "./ThemeProvider";
 import { Menu, Moon, Sun } from "lucide-react";
 import { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 
 const Header = () => {
   const { theme, setTheme } = useTheme();
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -23,11 +25,18 @@ const Header = () => {
   };
 
   const scrollToSection = (id: string) => {
-    const element = document.getElementById(id);
-    if (element) {
-      element.scrollIntoView({ behavior: "smooth" });
+    // If on homepage, scroll to section
+    if (window.location.pathname === "/") {
+      const element = document.getElementById(id);
+      if (element) {
+        element.scrollIntoView({ behavior: "smooth" });
+      }
+      setMobileMenuOpen(false);
+    } else {
+      // If on another page, navigate to homepage and then scroll
+      navigate("/#" + id);
+      setMobileMenuOpen(false);
     }
-    setMobileMenuOpen(false);
   };
 
   return (
@@ -38,7 +47,7 @@ const Header = () => {
     >
       <div className="container mx-auto px-4 py-4 flex items-center justify-between">
         <div className="flex items-center">
-          <span className="text-2xl font-bold gradient-text">Socratix</span>
+          <Link to="/" className="text-2xl font-bold gradient-text">Socratix</Link>
         </div>
 
         {/* Desktop Navigation */}
@@ -67,8 +76,8 @@ const Header = () => {
           >
             Join Waitlist
           </button>
-          <Button onClick={() => scrollToSection("demo")} variant="default" size="sm">
-            Try Demo
+          <Button asChild>
+            <Link to="/demo">Try Demo</Link>
           </Button>
           <button onClick={toggleTheme} className="p-2 rounded-full hover:bg-muted transition-colors">
             {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
@@ -119,9 +128,9 @@ const Header = () => {
             >
               Join Waitlist
             </button>
-            <Button onClick={() => scrollToSection("demo")} variant="default" size="sm" className="w-full">
-              Try Demo
-            </Button>
+            <Link to="/demo" className="w-full">
+              <Button className="w-full">Try Demo</Button>
+            </Link>
           </div>
         </div>
       )}

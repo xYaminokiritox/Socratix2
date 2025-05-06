@@ -45,7 +45,7 @@ const DemoSection = () => {
                 </div>
               </div>
               <div className="mt-8">
-                <Button variant="gradient" className="mr-4" asChild>
+                <Button variant="default" className="mr-4" asChild>
                   <Link to="/demo">Try Demo</Link>
                 </Button>
                 <Button variant="outline">Learn More</Button>
