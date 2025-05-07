@@ -2,6 +2,7 @@
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import Robot3D from "./Robot3D";
+import { ArrowRight } from "lucide-react";
 
 const DemoSection = () => {
   return (
@@ -43,15 +44,27 @@ const DemoSection = () => {
                     <p className="text-sm text-muted-foreground">Get immediate guidance as you work through concepts</p>
                   </div>
                 </div>
+                <div className="flex items-start">
+                  <div className="mr-3 h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+                    <svg className="w-5 h-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="font-medium">Comprehensive Analysis</p>
+                    <p className="text-sm text-muted-foreground">Track your progress and identify areas for improvement</p>
+                  </div>
+                </div>
               </div>
               <div className="mt-8">
                 <Button variant="default" className="mr-4" asChild>
-                  <Link to="/demo">Try Demo</Link>
+                  <Link to="/demo">Try Demo <ArrowRight className="ml-1 h-4 w-4" /></Link>
                 </Button>
                 <Button variant="outline">Learn More</Button>
               </div>
             </div>
             <div className="animate-on-scroll relative" style={{ transitionDelay: '0.4s' }}>
+              <div className="absolute -inset-4 bg-gradient-to-r from-purple-500/10 to-blue-500/10 rounded-3xl blur-xl opacity-70"></div>
               <Robot3D />
             </div>
           </div>
