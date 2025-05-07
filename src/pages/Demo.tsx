@@ -11,8 +11,6 @@ import NotesUploader from "@/components/NotesUploader";
 import ChatInterface from "@/components/ChatInterface";
 import Flashcard from "@/components/Flashcard";
 import SummarizedNotes from "@/components/SummarizedNotes";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import Reflection from "@/components/Reflection";
 
 const Demo = () => {
   const { toast } = useToast();
@@ -21,7 +19,6 @@ const Demo = () => {
   const [notes, setNotes] = useState("");
   const [summarizedNotes, setSummarizedNotes] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [activeMode, setActiveMode] = useState<"chat" | "flashcards" | "reflection">("chat");
   
   const handleStart = () => {
     if (!topic && !notes) {
@@ -107,32 +104,15 @@ const Demo = () => {
             </div>
           </Card>
         ) : (
-          <div className="space-y-6">
-            <div className="flex justify-center mb-6">
-              <ToggleGroup type="single" value={activeMode} onValueChange={(value) => value && setActiveMode(value as "chat" | "flashcards" | "reflection")}>
-                <ToggleGroupItem value="chat" aria-label="Chat mode">
-                  <MessageSquare className="mr-1 h-4 w-4" /> Chat
-                </ToggleGroupItem>
-                <ToggleGroupItem value="flashcards" aria-label="Flashcard mode">
-                  <Book className="mr-1 h-4 w-4" /> Flashcards
-                </ToggleGroupItem>
-                <ToggleGroupItem value="reflection" aria-label="Reflection mode">
-                  <ArrowUp className="mr-1 h-4 w-4" /> Reflection
-                </ToggleGroupItem>
-              </ToggleGroup>
+          <div className="grid md:grid-cols-3 gap-6">
+            <div className="md:col-span-2">
+              <ChatInterface />
             </div>
-          
-            <div className="grid md:grid-cols-3 gap-6">
-              <div className="md:col-span-2">
-                {activeMode === "chat" && <ChatInterface />}
-                {activeMode === "flashcards" && <Flashcard />}
-                {activeMode === "reflection" && <Reflection topic={topic || "your uploaded notes"} />}
-              </div>
+            
+            <div className="space-y-6">
+              <Flashcard />
               
-              <div className="space-y-6">
-                {activeMode !== "flashcards" && <Flashcard />}
-                <SummarizedNotes notes={summarizedNotes} />
-              </div>
+              <SummarizedNotes notes={summarizedNotes} />
             </div>
           </div>
         )}

@@ -47,7 +47,7 @@ const Flashcard = () => {
   };
   
   return (
-    <Card className="overflow-hidden h-full">
+    <Card className="overflow-hidden">
       <CardHeader className="bg-primary/5 py-3">
         <CardTitle className="flex items-center text-base">
           <Book className="mr-2 h-4 w-4 text-primary" />
@@ -60,13 +60,13 @@ const Flashcard = () => {
         <span>Tap card to flip</span>
       </div>
       
-      <CardContent className="p-4 flex-grow">
+      <CardContent className="p-4">
         <div 
           className="h-[200px] cursor-pointer"
           onClick={toggleFlip}
         >
           <div
-            className="relative w-full h-full transition-all duration-500"
+            className="relative w-full h-full transition-transform duration-500 transform-style-3d"
             style={{
               transformStyle: "preserve-3d",
               transform: isFlipped ? "rotateY(180deg)" : "rotateY(0deg)",
@@ -74,7 +74,7 @@ const Flashcard = () => {
           >
             {/* Front side - Question */}
             <div
-              className="absolute inset-0 flex items-center justify-center p-4 rounded-lg border bg-card"
+              className="absolute inset-0 flex items-center justify-center p-4 backface-hidden rounded-lg border bg-card"
               style={{
                 backfaceVisibility: "hidden",
               }}
@@ -84,7 +84,7 @@ const Flashcard = () => {
             
             {/* Back side - Answer */}
             <div
-              className="absolute inset-0 flex items-center justify-center p-4 rounded-lg border bg-primary/5"
+              className="absolute inset-0 flex items-center justify-center p-4 backface-hidden rounded-lg border bg-primary/5"
               style={{
                 backfaceVisibility: "hidden",
                 transform: "rotateY(180deg)",

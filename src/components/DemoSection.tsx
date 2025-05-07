@@ -5,7 +5,7 @@ import Robot3D from "./Robot3D";
 
 const DemoSection = () => {
   return (
-    <section id="demo" className="py-20 md:py-32 relative bg-background">
+    <section id="demo" className="py-20 md:py-32 relative">
       <div className="container px-4 mx-auto">
         <div className="max-w-5xl mx-auto">
           <h2 className="text-3xl md:text-4xl font-bold mb-12 text-center">
@@ -48,15 +48,11 @@ const DemoSection = () => {
                 <Button variant="default" className="mr-4" asChild>
                   <Link to="/demo">Try Demo</Link>
                 </Button>
-                <Button variant="outline" asChild>
-                  <Link to="/demo">Learn More</Link>
-                </Button>
+                <Button variant="outline">Learn More</Button>
               </div>
             </div>
             <div className="animate-on-scroll relative" style={{ transitionDelay: '0.4s' }}>
-              <div className="relative aspect-square rounded-lg overflow-hidden border shadow-lg bg-gradient-to-br from-primary/5 to-background">
-                <Robot3D />
-              </div>
+              <Robot3D />
             </div>
           </div>
         </div>
