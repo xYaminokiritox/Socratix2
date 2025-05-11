@@ -4,12 +4,15 @@ import { useTheme } from "./ThemeProvider";
 import { Menu, Moon, Sun } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
+import { UserMenu } from "./UserMenu";
 
 const Header = () => {
   const { theme, setTheme } = useTheme();
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const navigate = useNavigate();
+  const { session } = useAuth();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -76,9 +79,25 @@ const Header = () => {
           >
             Join Waitlist
           </button>
-          <Button asChild>
-            <Link to="/demo">Try Demo</Link>
-          </Button>
+
+          {session ? (
+            <>
+              <Button asChild>
+                <Link to="/demo">Try Demo</Link>
+              </Button>
+              <UserMenu />
+            </>
+          ) : (
+            <>
+              <Button variant="outline" asChild>
+                <Link to="/auth">Login</Link>
+              </Button>
+              <Button asChild>
+                <Link to="/auth?signup=true">Sign Up</Link>
+              </Button>
+            </>
+          )}
+
           <button onClick={toggleTheme} className="p-2 rounded-full hover:bg-muted transition-colors">
             {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
           </button>
@@ -86,6 +105,7 @@ const Header = () => {
 
         {/* Mobile Menu Button */}
         <div className="flex md:hidden items-center space-x-4">
+          {session && <UserMenu />}
           <button onClick={toggleTheme} className="p-2 rounded-full hover:bg-muted transition-colors">
             {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
           </button>
@@ -128,9 +148,20 @@ const Header = () => {
             >
               Join Waitlist
             </button>
-            <Link to="/demo" className="w-full">
-              <Button className="w-full">Try Demo</Button>
-            </Link>
+            {session ? (
+              <Link to="/demo" className="w-full">
+                <Button className="w-full">Try Demo</Button>
+              </Link>
+            ) : (
+              <>
+                <Link to="/auth" className="w-full">
+                  <Button variant="outline" className="w-full">Login</Button>
+                </Link>
+                <Link to="/auth?signup=true" className="w-full">
+                  <Button className="w-full">Sign Up</Button>
+                </Link>
+              </>
+            )}
           </div>
         </div>
       )}
