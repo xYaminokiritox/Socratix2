@@ -1,64 +1,182 @@
-import { useState } from "react";
+
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
-import { MessageSquare, Send } from "lucide-react";
+import { MessageSquare, Send, Loader2 } from "lucide-react";
+import { ConversationMessage, addMessage, callSocraticTutor, updateSessionEvaluation } from "@/services/socraticService";
+import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 
-interface Message {
-  id: string;
-  content: string;
-  sender: "user" | "bot";
-  timestamp: Date;
+interface ChatInterfaceProps {
+  sessionId: string | null;
+  topic: string;
+  onSessionCreated?: (sessionId: string) => void;
+  onEvaluationComplete?: (evaluation: {
+    completed: boolean;
+    confidence_score: number;
+    summary: string;
+  }) => void;
+  initialMessages?: ConversationMessage[];
 }
 
-const ChatInterface = () => {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: "1",
-      content: "Hi there! I'm your Socratix learning assistant. What questions do you have about this topic?",
-      sender: "bot",
-      timestamp: new Date(),
-    },
-  ]);
+const ChatInterface = ({
+  sessionId,
+  topic,
+  onSessionCreated,
+  onEvaluationComplete,
+  initialMessages = []
+}: ChatInterfaceProps) => {
+  const [messages, setMessages] = useState<ConversationMessage[]>(initialMessages);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
   
-  const handleSendMessage = () => {
-    if (!input.trim()) return;
+  // Scroll to bottom of messages
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+  
+  // Start session if we have a topic but no messages yet
+  useEffect(() => {
+    if (sessionId && topic && messages.length === 0) {
+      startConversation();
+    }
+  }, [sessionId, topic, messages.length]);
+  
+  const startConversation = async () => {
+    if (!sessionId || !topic) return;
     
-    // Add user message
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      content: input,
-      sender: "user",
-      timestamp: new Date(),
-    };
+    setIsLoading(true);
+    try {
+      // Get first question from AI
+      const response = await callSocraticTutor('start', { topic });
+      if (typeof response.result === 'string') {
+        // Add AI's first question to the conversation
+        const aiMessage = await addMessage(
+          sessionId,
+          response.result,
+          'ai',
+          'question',
+          1
+        );
+
+        // Update local messages state if we got a valid response
+        if (aiMessage) {
+          setMessages([aiMessage]);
+        }
+      }
+    } catch (error) {
+      console.error("Error starting conversation:", error);
+      toast.error("Failed to start the conversation");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSendMessage = async () => {
+    if (!input.trim() || !sessionId) return;
     
-    setMessages((prev) => [...prev, userMessage]);
+    const userMessage = input.trim();
     setInput("");
     setIsLoading(true);
     
-    // Simulate bot response
-    setTimeout(() => {
-      const botResponses = [
-        "That's an interesting question! Let me ask you: what do you already know about this concept?",
-        "Great question. To understand this better, could you explain why you think this happens?",
-        "I see where you're going with this. Instead of giving you the answer directly, let's break it down. What are the key components involved?",
-        "Let's approach this from a different angle. What would happen if the conditions were different?",
-      ];
+    try {
+      // Calculate the next sequence numbers
+      const nextUserSeq = messages.length + 1;
+      const nextAiSeq = nextUserSeq + 1;
       
-      const randomResponse = botResponses[Math.floor(Math.random() * botResponses.length)];
+      // Save user's response to the database
+      const savedUserMsg = await addMessage(
+        sessionId,
+        userMessage,
+        'user',
+        'answer',
+        nextUserSeq
+      );
       
-      const botMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        content: randomResponse,
-        sender: "bot",
-        timestamp: new Date(),
-      };
+      if (!savedUserMsg) throw new Error("Failed to save user message");
       
-      setMessages((prev) => [...prev, botMessage]);
+      // Update local messages state with user's message
+      const updatedMessages = [...messages, savedUserMsg];
+      setMessages(updatedMessages);
+      
+      // Prepare conversation history for the AI
+      const conversationHistory: { role: "system" | "user" | "assistant"; content: string }[] = updatedMessages.map(msg => ({
+        role: msg.sender === 'ai' ? 'assistant' : 'user',
+        content: msg.content
+      }));
+      
+      // Check if we should evaluate the conversation
+      const userMessagesCount = updatedMessages.filter(msg => msg.sender === 'user').length;
+      const shouldEvaluate = userMessagesCount >= 5;
+      
+      if (shouldEvaluate) {
+        // Call AI to evaluate the conversation
+        const evaluationResponse = await callSocraticTutor('evaluate', {
+          topic,
+          conversationHistory
+        });
+        
+        if (typeof evaluationResponse.result !== 'string') {
+          // Save evaluation results
+          await updateSessionEvaluation(
+            sessionId,
+            evaluationResponse.result.completed,
+            evaluationResponse.result.confidence_score,
+            evaluationResponse.result.summary
+          );
+          
+          // Add evaluation message
+          const evalMessage = await addMessage(
+            sessionId,
+            JSON.stringify(evaluationResponse.result),
+            'ai',
+            'evaluation',
+            nextAiSeq
+          );
+          
+          if (evalMessage) {
+            setMessages([...updatedMessages, evalMessage]);
+          }
+          
+          // Call the callback if provided
+          if (onEvaluationComplete) {
+            onEvaluationComplete(evaluationResponse.result);
+          }
+          
+          toast.success("Learning session completed!");
+        }
+      } else {
+        // Continue the conversation with next AI question
+        const response = await callSocraticTutor('continue', {
+          userResponse: userMessage,
+          conversationHistory
+        });
+        
+        if (typeof response.result === 'string') {
+          // Save AI's response to the database
+          const aiMessage = await addMessage(
+            sessionId,
+            response.result,
+            'ai',
+            'question',
+            nextAiSeq
+          );
+          
+          // Update local messages state with AI's response
+          if (aiMessage) {
+            setMessages([...updatedMessages, aiMessage]);
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error in conversation:", error);
+      toast.error("Failed to process your response");
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
   
   return (
@@ -66,34 +184,79 @@ const ChatInterface = () => {
       <CardHeader>
         <CardTitle className="flex items-center">
           <MessageSquare className="mr-2 h-5 w-5 text-primary" />
-          Socratix Chat
+          Socratic Learning: {topic || "New Session"}
         </CardTitle>
       </CardHeader>
       
       <CardContent className="flex-1 overflow-y-auto mb-4 space-y-4 px-4">
-        {messages.map((message) => (
-          <div
-            key={message.id}
-            className={`flex ${message.sender === "user" ? "justify-end" : "justify-start"}`}
-          >
+        {messages.length === 0 && !isLoading && (
+          <div className="h-full flex flex-col items-center justify-center text-muted-foreground">
+            <MessageSquare className="h-10 w-10 mb-2 opacity-50" />
+            <p>Start your learning journey with Socratic questioning</p>
+          </div>
+        )}
+        
+        {messages.map((message, index) => {
+          if (message.message_type === 'evaluation') {
+            try {
+              const evaluation = JSON.parse(message.content);
+              return (
+                <Card key={message.id || index} className="bg-primary/5 p-4">
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center">
+                      <h4 className="font-semibold text-primary">Learning Complete!</h4>
+                      <Badge variant="secondary">
+                        {evaluation.confidence_score}% Understanding
+                      </Badge>
+                    </div>
+                    
+                    <Progress 
+                      value={evaluation.confidence_score} 
+                      className="h-2"
+                    />
+                    
+                    <p className="text-sm">{evaluation.summary}</p>
+                  </div>
+                </Card>
+              );
+            } catch (e) {
+              // If can't parse as JSON, display as normal message
+              return (
+                <div
+                  key={message.id || index}
+                  className={`flex ${message.sender === "user" ? "justify-end" : "justify-start"}`}
+                >
+                  <div
+                    className={`max-w-[80%] rounded-lg p-3 ${
+                      message.sender === "user"
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted"
+                    }`}
+                  >
+                    <p>{message.content}</p>
+                  </div>
+                </div>
+              );
+            }
+          }
+          
+          return (
             <div
-              className={`max-w-[80%] rounded-lg p-3 ${
-                message.sender === "user"
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted"
-              }`}
+              key={message.id || index}
+              className={`flex ${message.sender === "user" ? "justify-end" : "justify-start"}`}
             >
-              <p>{message.content}</p>
               <div
-                className={`text-xs mt-1 ${
-                  message.sender === "user" ? "text-primary-foreground/70" : "text-muted-foreground"
+                className={`max-w-[80%] rounded-lg p-3 ${
+                  message.sender === "user"
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted"
                 }`}
               >
-                {message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                <p>{message.content}</p>
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
         
         {isLoading && (
           <div className="flex justify-start">
@@ -106,12 +269,13 @@ const ChatInterface = () => {
             </div>
           </div>
         )}
+        <div ref={messagesEndRef} />
       </CardContent>
       
       <CardFooter className="pt-4 border-t">
         <div className="w-full flex gap-2">
           <Textarea
-            placeholder="Type your question here..."
+            placeholder="Type your response here..."
             className="resize-none flex-1"
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -121,9 +285,10 @@ const ChatInterface = () => {
                 handleSendMessage();
               }
             }}
+            disabled={isLoading || !sessionId}
           />
-          <Button onClick={handleSendMessage} disabled={!input.trim() || isLoading}>
-            <Send className="h-4 w-4" />
+          <Button onClick={handleSendMessage} disabled={!input.trim() || isLoading || !sessionId}>
+            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           </Button>
         </div>
       </CardFooter>

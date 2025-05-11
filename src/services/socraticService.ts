@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { Tables } from "@/integrations/supabase/types";
 
@@ -12,6 +13,83 @@ export interface SocraticResponse {
     summary: string;
   };
 }
+
+// Gamification types
+export interface Badge {
+  id: string;
+  name: string;
+  description: string;
+  image: string;
+  criteria: string;
+}
+
+export interface Achievement {
+  id: string;
+  name: string;
+  description: string;
+  image: string;
+  linkedinTitle: string;
+  linkedinDescription: string;
+}
+
+// Available badges
+export const AVAILABLE_BADGES: Badge[] = [
+  {
+    id: "first_session",
+    name: "First Steps",
+    description: "Started your first learning session",
+    image: "🔰",
+    criteria: "Complete 1 learning session"
+  },
+  {
+    id: "deep_learner",
+    name: "Deep Learner",
+    description: "Achieved a high understanding score",
+    image: "🧠",
+    criteria: "Get 80% or higher on a learning evaluation"
+  },
+  {
+    id: "quick_study",
+    name: "Quick Study",
+    description: "Completed a session in record time",
+    image: "⚡",
+    criteria: "Complete a session in under 5 minutes"
+  },
+  {
+    id: "curious_mind",
+    name: "Curious Mind",
+    description: "Asked a lot of great questions",
+    image: "❓",
+    criteria: "Send 10+ messages in a single session"
+  },
+  {
+    id: "knowledge_seeker",
+    name: "Knowledge Seeker",
+    description: "Explored multiple topics",
+    image: "🔍",
+    criteria: "Study 3 different topics"
+  }
+];
+
+// Available achievements
+export const AVAILABLE_ACHIEVEMENTS: Achievement[] = [
+  {
+    id: "topic_mastery",
+    name: "Topic Mastery",
+    description: "Achieved complete understanding of a topic",
+    image: "🏆",
+    linkedinTitle: "Achieved Topic Mastery on Socratix",
+    linkedinDescription: "Demonstrated comprehensive understanding of a complex topic through Socratic dialogue."
+  },
+  {
+    id: "consistent_learner",
+    name: "Consistent Learner",
+    description: "Completed learning sessions on 5 consecutive days",
+    image: "📚",
+    linkedinTitle: "Consistent Learner Achievement on Socratix",
+    linkedinDescription: "Demonstrated dedication to continuous learning through daily study sessions."
+  }
+];
 
 // Function to start a new learning session
 export const createSession = async (topic: string): Promise<LearningSession | null> => {
@@ -31,6 +109,16 @@ export const createSession = async (topic: string): Promise<LearningSession | nu
   if (error) {
     console.error("Error creating session:", error);
     return null;
+  }
+
+  // Award the "first_session" badge if this is their first session
+  const { data: sessions } = await supabase
+    .from("learning_sessions")
+    .select("id")
+    .eq("user_id", user.id);
+    
+  if (sessions && sessions.length === 1) {
+    await awardBadge(user.id, "first_session");
   }
 
   return data;
@@ -108,6 +196,22 @@ export const addMessage = async (
     return null;
   }
 
+  // If user sends a lot of messages in one session, award the curious_mind badge
+  if (sender === 'user') {
+    const { data: messages } = await supabase
+      .from("conversation_messages")
+      .select("id")
+      .eq("session_id", sessionId)
+      .eq("sender", "user");
+    
+    if (messages && messages.length >= 10) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await awardBadge(user.id, "curious_mind");
+      }
+    }
+  }
+
   return data;
 };
 
@@ -135,6 +239,32 @@ export const updateSessionEvaluation = async (
     return null;
   }
 
+  // Award badges based on confidence score
+  if (completed && data) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      if (confidenceScore >= 80) {
+        await awardBadge(user.id, "deep_learner");
+        await awardAchievement(user.id, "topic_mastery", data.topic);
+      }
+      
+      // Check for multiple topics studied
+      const { data: sessions } = await supabase
+        .from("learning_sessions")
+        .select("topic")
+        .eq("user_id", user.id)
+        .eq("completed", true);
+      
+      if (sessions) {
+        // Count unique topics
+        const uniqueTopics = new Set(sessions.map(s => s.topic));
+        if (uniqueTopics.size >= 3) {
+          await awardBadge(user.id, "knowledge_seeker");
+        }
+      }
+    }
+  }
+
   return data;
 };
 
@@ -145,7 +275,7 @@ export const callSocraticTutor = async (
     topic?: string;
     sessionId?: string;
     userResponse?: string;
-    conversationHistory?: { role: 'system' | 'user' | 'assistant', content: string }[];
+    conversationHistory?: { role: 'system' | 'user' | 'assistant'; content: string }[];
   }
 ): Promise<SocraticResponse> => {
   const { data, error } = await supabase.functions.invoke('socratic-tutor', {
@@ -161,4 +291,132 @@ export const callSocraticTutor = async (
   }
 
   return data;
+};
+
+// Gamification functions
+
+// Function to award a badge to a user
+export const awardBadge = async (userId: string, badgeId: string): Promise<boolean> => {
+  // Check if the user already has this badge
+  const { data: existingBadges } = await supabase
+    .from("user_badges")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("badge_id", badgeId);
+  
+  if (existingBadges && existingBadges.length > 0) {
+    // User already has this badge
+    return false;
+  }
+  
+  // Award the new badge
+  const { error } = await supabase
+    .from("user_badges")
+    .insert([{
+      user_id: userId,
+      badge_id: badgeId,
+      awarded_at: new Date().toISOString()
+    }]);
+    
+  if (error) {
+    console.error("Error awarding badge:", error);
+    return false;
+  }
+  
+  return true;
+};
+
+// Function to award an achievement to a user
+export const awardAchievement = async (userId: string, achievementId: string, topic: string): Promise<boolean> => {
+  // Check if the user already has this achievement
+  const { data: existingAchievements } = await supabase
+    .from("user_achievements")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("achievement_id", achievementId);
+  
+  if (existingAchievements && existingAchievements.length > 0) {
+    // User already has this achievement
+    return false;
+  }
+  
+  // Award the new achievement
+  const { error } = await supabase
+    .from("user_achievements")
+    .insert([{
+      user_id: userId,
+      achievement_id: achievementId,
+      topic,
+      awarded_at: new Date().toISOString()
+    }]);
+    
+  if (error) {
+    console.error("Error awarding achievement:", error);
+    return false;
+  }
+  
+  return true;
+};
+
+// Function to get user's badges
+export const getUserBadges = async (userId: string): Promise<Badge[]> => {
+  const { data, error } = await supabase
+    .from("user_badges")
+    .select("badge_id")
+    .eq("user_id", userId);
+    
+  if (error || !data) {
+    console.error("Error retrieving user badges:", error);
+    return [];
+  }
+  
+  // Map badge IDs to actual badge objects
+  return data
+    .map(item => AVAILABLE_BADGES.find(badge => badge.id === item.badge_id))
+    .filter((badge): badge is Badge => badge !== undefined);
+};
+
+// Function to get user's achievements
+export const getUserAchievements = async (userId: string): Promise<(Achievement & {topic: string})[]> => {
+  const { data, error } = await supabase
+    .from("user_achievements")
+    .select("achievement_id, topic")
+    .eq("user_id", userId);
+    
+  if (error || !data) {
+    console.error("Error retrieving user achievements:", error);
+    return [];
+  }
+  
+  // Map achievement IDs to actual achievement objects
+  return data
+    .map(item => {
+      const achievement = AVAILABLE_ACHIEVEMENTS.find(a => a.id === item.achievement_id);
+      if (achievement) {
+        return {
+          ...achievement,
+          topic: item.topic
+        };
+      }
+      return undefined;
+    })
+    .filter((achievement): achievement is (Achievement & {topic: string}) => achievement !== undefined);
+};
+
+// Function to get user's points
+export const getUserPoints = async (userId: string): Promise<number> => {
+  const { data: sessions } = await supabase
+    .from("learning_sessions")
+    .select("confidence_score")
+    .eq("user_id", userId)
+    .eq("completed", true);
+  
+  if (!sessions) return 0;
+  
+  // Calculate points: 10 points per completed session plus bonus points based on confidence score
+  return sessions.reduce((total, session) => {
+    const basePoints = 10;
+    const confidenceBonus = session.confidence_score ? Math.floor(session.confidence_score / 10) : 0;
+    return total + basePoints + confidenceBonus;
+  }, 0);
 };
