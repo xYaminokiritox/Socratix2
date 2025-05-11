@@ -6,14 +6,16 @@ import { Badge } from "./ui/badge";
 import { Share, Trophy, Award } from "lucide-react";
 import { Achievement, Badge as BadgeType } from "@/services/socraticService";
 import { useState } from "react";
+import { Progress } from "./ui/progress";
 
 interface AchievementShareProps {
   achievement?: Achievement & { topic: string };
   badge?: BadgeType;
   onClose?: () => void;
+  progress?: number;
 }
 
-const AchievementShare = ({ achievement, badge, onClose }: AchievementShareProps) => {
+const AchievementShare = ({ achievement, badge, onClose, progress }: AchievementShareProps) => {
   const [copied, setCopied] = useState(false);
   
   const item = achievement || badge;
@@ -70,9 +72,21 @@ const AchievementShare = ({ achievement, badge, onClose }: AchievementShareProps
             </CardHeader>
             <CardContent>
               {isAchievement && (
-                <Badge className="w-full justify-center mb-4" variant="secondary">
-                  Topic: {(item as any).topic}
-                </Badge>
+                <>
+                  <Badge className="w-full justify-center mb-4" variant="secondary">
+                    Topic: {(item as any).topic}
+                  </Badge>
+                  
+                  {progress !== undefined && (
+                    <div className="mb-4 space-y-1">
+                      <div className="flex justify-between text-xs">
+                        <span>Learning Progress</span>
+                        <span>{progress}%</span>
+                      </div>
+                      <Progress value={progress} className="h-2" />
+                    </div>
+                  )}
+                </>
               )}
               
               <div className="flex gap-2 justify-center">

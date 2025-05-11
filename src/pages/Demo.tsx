@@ -16,6 +16,7 @@ import { createSession, getUserBadges, getUserAchievements, Badge, Achievement }
 import AchievementShare from "@/components/AchievementShare";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { Progress } from "@/components/ui/progress";
 
 const Demo = () => {
   const { toast: hookToast } = useToast();
@@ -38,6 +39,9 @@ const Demo = () => {
   
   const [initialBadgeCount, setInitialBadgeCount] = useState(0);
   const [initialAchievementCount, setInitialAchievementCount] = useState(0);
+  
+  // For progress tracking during the session
+  const [learningProgress, setLearningProgress] = useState(0);
   
   // Load user's initial badge and achievement counts
   useEffect(() => {
@@ -86,6 +90,11 @@ const Demo = () => {
     };
     
     checkNewRewards();
+    
+    // Set final progress based on confidence score
+    if (evaluation.confidence_score) {
+      setLearningProgress(evaluation.confidence_score);
+    }
   }, [evaluation, session, initialBadgeCount, initialAchievementCount]);
   
   const handleStart = async () => {
@@ -105,6 +114,7 @@ const Demo = () => {
     }
     
     setIsLoading(true);
+    setLearningProgress(0); // Reset progress
     
     try {
       // Create a new session in the database
@@ -132,6 +142,20 @@ const Demo = () => {
       }
       
       setActiveStep("learning");
+      
+      // Start with initial progress
+      setLearningProgress(5);
+      
+      // Simulate progress increase as user engages
+      const progressInterval = setInterval(() => {
+        setLearningProgress(prev => {
+          const newProgress = prev + 1;
+          return newProgress > 60 ? 60 : newProgress; // Cap at 60% until evaluation
+        });
+      }, 5000);
+      
+      // Clear interval when component unmounts or session completes
+      return () => clearInterval(progressInterval);
     } catch (error) {
       console.error("Error starting session:", error);
       toast.error("Failed to start learning session");
@@ -146,6 +170,11 @@ const Demo = () => {
     summary: string;
   }) => {
     setEvaluation(result);
+    
+    // Set final progress based on evaluation
+    if (result.confidence_score) {
+      setLearningProgress(result.confidence_score);
+    }
   };
   
   return (
@@ -202,6 +231,24 @@ const Demo = () => {
         ) : (
           <div className="grid md:grid-cols-3 gap-6">
             <div className="md:col-span-2">
+              {/* Learning Progress Bar */}
+              {activeStep === "learning" && (
+                <Card className="mb-4 p-4">
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span>Learning Progress</span>
+                      <span>{learningProgress}%</span>
+                    </div>
+                    <Progress value={learningProgress} />
+                    <p className="text-xs text-muted-foreground">
+                      {evaluation?.completed 
+                        ? "Session completed! Check your achievements below." 
+                        : "Keep learning to improve your understanding and earn badges!"}
+                    </p>
+                  </div>
+                </Card>
+              )}
+              
               <ChatInterface 
                 sessionId={sessionId}
                 topic={topic || "Notes Analysis"}
@@ -227,6 +274,7 @@ const Demo = () => {
                     setSummarizedNotes("");
                     setSessionId(null);
                     setEvaluation(null);
+                    setLearningProgress(0);
                   }}
                 >
                   <ArrowUp className="mr-2 h-4 w-4" />
@@ -249,6 +297,7 @@ const Demo = () => {
       {newAchievement && (
         <AchievementShare 
           achievement={newAchievement}
+          progress={learningProgress}
           onClose={() => setNewAchievement(null)}
         />
       )}

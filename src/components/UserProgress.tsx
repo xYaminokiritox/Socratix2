@@ -13,6 +13,7 @@ import {
 import { useAuth } from "@/hooks/useAuth";
 import AchievementShare from "./AchievementShare";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
+import { Progress } from "./ui/progress";
 
 const UserProgress = () => {
   const { session } = useAuth();
@@ -121,12 +122,10 @@ const UserProgress = () => {
                     <span>Progress to Level {levelInfo.nextLevel.level}</span>
                     <span>{levelInfo.progress}%</span>
                   </div>
-                  <div className="h-2 bg-muted rounded-full overflow-hidden">
-                    <div 
-                      className="h-full bg-gradient-to-r from-primary to-purple-500" 
-                      style={{ width: `${levelInfo.progress}%` }}
-                    ></div>
-                  </div>
+                  <Progress 
+                    value={levelInfo.progress}
+                    className="h-2"
+                  />
                   <p className="text-xs text-muted-foreground">
                     {levelInfo.nextLevel.pointsNeeded} more points to reach Level {levelInfo.nextLevel.level}
                   </p>
@@ -200,6 +199,7 @@ const UserProgress = () => {
         ) : (
           <AchievementShare 
             achievement={selectedItem.item} 
+            progress={levelInfo.progress}
             onClose={() => setSelectedItem(null)}
           />
         )
