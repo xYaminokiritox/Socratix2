@@ -295,128 +295,136 @@ export const callSocraticTutor = async (
 
 // Gamification functions
 
+// Helper function to get user's badges from localStorage
+const getUserBadgesFromStorage = (userId: string): string[] => {
+  const key = `user_badges_${userId}`;
+  const storedBadges = localStorage.getItem(key);
+  return storedBadges ? JSON.parse(storedBadges) : [];
+};
+
+// Helper function to save user's badges to localStorage
+const saveUserBadgesToStorage = (userId: string, badges: string[]) => {
+  const key = `user_badges_${userId}`;
+  localStorage.setItem(key, JSON.stringify(badges));
+};
+
+// Helper function to get user's achievements from localStorage
+const getUserAchievementsFromStorage = (userId: string): {id: string, topic: string}[] => {
+  const key = `user_achievements_${userId}`;
+  const storedAchievements = localStorage.getItem(key);
+  return storedAchievements ? JSON.parse(storedAchievements) : [];
+};
+
+// Helper function to save user's achievements to localStorage
+const saveUserAchievementsToStorage = (userId: string, achievements: {id: string, topic: string}[]) => {
+  const key = `user_achievements_${userId}`;
+  localStorage.setItem(key, JSON.stringify(achievements));
+};
+
 // Function to award a badge to a user
 export const awardBadge = async (userId: string, badgeId: string): Promise<boolean> => {
-  // Check if the user already has this badge
-  const { data: existingBadges } = await supabase
-    .from("user_badges")
-    .select("id")
-    .eq("user_id", userId)
-    .eq("badge_id", badgeId);
-  
-  if (existingBadges && existingBadges.length > 0) {
-    // User already has this badge
-    return false;
-  }
-  
-  // Award the new badge
-  const { error } = await supabase
-    .from("user_badges")
-    .insert([{
-      user_id: userId,
-      badge_id: badgeId,
-      awarded_at: new Date().toISOString()
-    }]);
+  try {
+    // Get current badges
+    const userBadges = getUserBadgesFromStorage(userId);
     
-  if (error) {
+    // Check if the user already has this badge
+    if (userBadges.includes(badgeId)) {
+      return false;
+    }
+    
+    // Award the new badge
+    userBadges.push(badgeId);
+    saveUserBadgesToStorage(userId, userBadges);
+    
+    console.log(`Badge ${badgeId} awarded to user ${userId}`);
+    return true;
+  } catch (error) {
     console.error("Error awarding badge:", error);
     return false;
   }
-  
-  return true;
 };
 
 // Function to award an achievement to a user
 export const awardAchievement = async (userId: string, achievementId: string, topic: string): Promise<boolean> => {
-  // Check if the user already has this achievement
-  const { data: existingAchievements } = await supabase
-    .from("user_achievements")
-    .select("id")
-    .eq("user_id", userId)
-    .eq("achievement_id", achievementId);
-  
-  if (existingAchievements && existingAchievements.length > 0) {
-    // User already has this achievement
-    return false;
-  }
-  
-  // Award the new achievement
-  const { error } = await supabase
-    .from("user_achievements")
-    .insert([{
-      user_id: userId,
-      achievement_id: achievementId,
-      topic,
-      awarded_at: new Date().toISOString()
-    }]);
+  try {
+    // Get current achievements
+    const userAchievements = getUserAchievementsFromStorage(userId);
     
-  if (error) {
+    // Check if the user already has this achievement
+    if (userAchievements.some(a => a.id === achievementId)) {
+      return false;
+    }
+    
+    // Award the new achievement
+    userAchievements.push({ id: achievementId, topic });
+    saveUserAchievementsToStorage(userId, userAchievements);
+    
+    console.log(`Achievement ${achievementId} awarded to user ${userId} for topic ${topic}`);
+    return true;
+  } catch (error) {
     console.error("Error awarding achievement:", error);
     return false;
   }
-  
-  return true;
 };
 
 // Function to get user's badges
 export const getUserBadges = async (userId: string): Promise<Badge[]> => {
-  const { data, error } = await supabase
-    .from("user_badges")
-    .select("badge_id")
-    .eq("user_id", userId);
+  try {
+    const badgeIds = getUserBadgesFromStorage(userId);
     
-  if (error || !data) {
+    // Map badge IDs to actual badge objects
+    return badgeIds
+      .map(badgeId => AVAILABLE_BADGES.find(badge => badge.id === badgeId))
+      .filter((badge): badge is Badge => badge !== undefined);
+  } catch (error) {
     console.error("Error retrieving user badges:", error);
     return [];
   }
-  
-  // Map badge IDs to actual badge objects
-  return data
-    .map(item => AVAILABLE_BADGES.find(badge => badge.id === item.badge_id))
-    .filter((badge): badge is Badge => badge !== undefined);
 };
 
 // Function to get user's achievements
 export const getUserAchievements = async (userId: string): Promise<(Achievement & {topic: string})[]> => {
-  const { data, error } = await supabase
-    .from("user_achievements")
-    .select("achievement_id, topic")
-    .eq("user_id", userId);
+  try {
+    const userAchievements = getUserAchievementsFromStorage(userId);
     
-  if (error || !data) {
+    // Map achievement IDs to actual achievement objects
+    return userAchievements
+      .map(item => {
+        const achievement = AVAILABLE_ACHIEVEMENTS.find(a => a.id === item.id);
+        if (achievement) {
+          return {
+            ...achievement,
+            topic: item.topic
+          };
+        }
+        return undefined;
+      })
+      .filter((achievement): achievement is (Achievement & {topic: string}) => achievement !== undefined);
+  } catch (error) {
     console.error("Error retrieving user achievements:", error);
     return [];
   }
-  
-  // Map achievement IDs to actual achievement objects
-  return data
-    .map(item => {
-      const achievement = AVAILABLE_ACHIEVEMENTS.find(a => a.id === item.achievement_id);
-      if (achievement) {
-        return {
-          ...achievement,
-          topic: item.topic
-        };
-      }
-      return undefined;
-    })
-    .filter((achievement): achievement is (Achievement & {topic: string}) => achievement !== undefined);
 };
 
 // Function to get user's points
 export const getUserPoints = async (userId: string): Promise<number> => {
-  const { data: sessions } = await supabase
-    .from("learning_sessions")
-    .select("confidence_score")
-    .eq("user_id", userId)
-    .eq("completed", true);
-  
-  if (!sessions) return 0;
-  
-  // Calculate points: 10 points per completed session plus bonus points based on confidence score
-  return sessions.reduce((total, session) => {
-    const basePoints = 10;
-    const confidenceBonus = session.confidence_score ? Math.floor(session.confidence_score / 10) : 0;
-    return total + basePoints + confidenceBonus;
-  }, 0);
+  try {
+    const { data: sessions } = await supabase
+      .from("learning_sessions")
+      .select("confidence_score")
+      .eq("user_id", userId)
+      .eq("completed", true);
+    
+    if (!sessions) return 0;
+    
+    // Calculate points: 10 points per completed session plus bonus points based on confidence score
+    return sessions.reduce((total, session) => {
+      const basePoints = 10;
+      const confidenceBonus = session.confidence_score ? Math.floor(session.confidence_score / 10) : 0;
+      return total + basePoints + confidenceBonus;
+    }, 0);
+  } catch (error) {
+    console.error("Error calculating user points:", error);
+    return 0;
+  }
 };
