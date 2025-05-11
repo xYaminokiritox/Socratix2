@@ -1,7 +1,7 @@
 
 import { Button } from "@/components/ui/button";
 import { useTheme } from "./ThemeProvider";
-import { Menu, Moon, Sun } from "lucide-react";
+import { Menu, Moon, Sun, BookOpen, List } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -82,8 +82,17 @@ const Header = () => {
 
           {session ? (
             <>
+              <Button variant="ghost" asChild>
+                <Link to="/sessions" className="flex items-center">
+                  <List className="h-4 w-4 mr-2" />
+                  My Sessions
+                </Link>
+              </Button>
               <Button asChild>
-                <Link to="/demo">Try Demo</Link>
+                <Link to="/learning" className="flex items-center">
+                  <BookOpen className="h-4 w-4 mr-2" />
+                  Learn
+                </Link>
               </Button>
               <UserMenu />
             </>
@@ -148,10 +157,22 @@ const Header = () => {
             >
               Join Waitlist
             </button>
+            
             {session ? (
-              <Link to="/demo" className="w-full">
-                <Button className="w-full">Try Demo</Button>
-              </Link>
+              <>
+                <Link to="/sessions" className="w-full">
+                  <Button variant="outline" className="w-full flex items-center justify-center">
+                    <List className="h-4 w-4 mr-2" />
+                    My Sessions
+                  </Button>
+                </Link>
+                <Link to="/learning" className="w-full">
+                  <Button className="w-full flex items-center justify-center">
+                    <BookOpen className="h-4 w-4 mr-2" />
+                    Learn
+                  </Button>
+                </Link>
+              </>
             ) : (
               <>
                 <Link to="/auth" className="w-full">

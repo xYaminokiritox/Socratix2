@@ -10,6 +10,8 @@ import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import { AuthProvider } from "./hooks/useAuth";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
+import Learning from "./pages/Learning";
+import Sessions from "./pages/Sessions";
 
 const queryClient = new QueryClient();
 
@@ -26,6 +28,21 @@ const App = () => (
             <Route path="/demo" element={
               <ProtectedRoute>
                 <Demo />
+              </ProtectedRoute>
+            } />
+            <Route path="/learning" element={
+              <ProtectedRoute>
+                <Learning />
+              </ProtectedRoute>
+            } />
+            <Route path="/learning/:sessionId" element={
+              <ProtectedRoute>
+                <Learning />
+              </ProtectedRoute>
+            } />
+            <Route path="/sessions" element={
+              <ProtectedRoute>
+                <Sessions />
               </ProtectedRoute>
             } />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
