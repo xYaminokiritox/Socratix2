@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -155,7 +154,7 @@ const Learning = () => {
       setMessages(updatedMessages);
 
       // Prepare conversation history for the AI
-      const conversationHistory = updatedMessages.map(msg => ({
+      const conversationHistory: { role: "system" | "user" | "assistant"; content: string }[] = updatedMessages.map(msg => ({
         role: msg.sender === 'ai' ? 'assistant' : 'user',
         content: msg.content
       }));

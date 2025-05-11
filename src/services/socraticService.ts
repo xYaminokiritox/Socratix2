@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { Tables } from "@/integrations/supabase/types";
 
@@ -16,9 +15,16 @@ export interface SocraticResponse {
 
 // Function to start a new learning session
 export const createSession = async (topic: string): Promise<LearningSession | null> => {
+  // Fix: Get the user ID first, then use it in the insert operation
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    console.error("No authenticated user found");
+    return null;
+  }
+
   const { data, error } = await supabase
     .from("learning_sessions")
-    .insert([{ topic, user_id: supabase.auth.getUser().then(res => res.data.user?.id) }])
+    .insert([{ topic, user_id: user.id }])
     .select()
     .single();
 
