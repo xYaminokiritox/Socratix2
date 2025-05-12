@@ -13,6 +13,7 @@ interface SocraticRequest {
   sessionId?: string;
   userResponse?: string;
   userLevel?: 'beginner' | 'intermediate' | 'advanced';
+  responseTiming?: 'normal' | 'fast' | 'slow';
   conversationHistory?: {
     role: 'system' | 'user' | 'assistant';
     content: string;
@@ -31,7 +32,7 @@ serve(async (req) => {
       throw new Error('OpenAI API key not found');
     }
 
-    const { action, topic, sessionId, userResponse, conversationHistory, userLevel } = await req.json() as SocraticRequest;
+    const { action, topic, sessionId, userResponse, conversationHistory, userLevel, responseTiming } = await req.json() as SocraticRequest;
     
     let messages: { role: string; content: string }[] = [];
     
@@ -62,6 +63,12 @@ serve(async (req) => {
         `The user appears to be at a ${userLevel} level, so adjust your questions accordingly.` : 
         'Adapt to the user\'s level of understanding based on their previous responses.';
       
+      // Adjust response pacing based on user timing
+      const timingAdjustment = responseTiming ? 
+        `The user responds at a ${responseTiming} pace, so ${responseTiming === 'fast' ? 'increase complexity and depth' : 
+          responseTiming === 'slow' ? 'simplify and provide more guidance' : 'maintain balanced complexity'}.` : 
+        'Maintain a balanced pace in your responses.';
+      
       messages = [
         ...conversationHistory,
         { role: 'user', content: userResponse },
@@ -72,6 +79,7 @@ serve(async (req) => {
           2. A follow-up question that builds upon their answer
           
           ${difficultyAdjustment}
+          ${timingAdjustment}
           
           Your follow-up question should push them to think more deeply or consider another aspect of the topic.
           Format your response as: 

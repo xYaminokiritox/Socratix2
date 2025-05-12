@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { Tables } from "@/integrations/supabase/types";
 
@@ -213,7 +214,7 @@ export const addMessage = async (
   sessionId: string, 
   content: string, 
   sender: 'ai' | 'user', 
-  messageType: 'question' | 'answer' | 'evaluation',
+  messageType: 'question' | 'answer' | 'evaluation' | 'feedback',
   sequenceNumber: number
 ): Promise<ConversationMessage | null> => {
   const { data, error } = await supabase
@@ -314,6 +315,7 @@ export const callSocraticTutor = async (
     userResponse?: string;
     conversationHistory?: { role: 'system' | 'user' | 'assistant'; content: string }[];
     userLevel?: 'beginner' | 'intermediate' | 'advanced';
+    responseTiming?: 'normal' | 'fast' | 'slow';
   }
 ): Promise<SocraticResponse> => {
   const { data, error } = await supabase.functions.invoke('socratic-tutor', {
