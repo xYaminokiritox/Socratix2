@@ -33,6 +33,7 @@ const ChatInterface = ({
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [userLevel, setUserLevel] = useState<'beginner' | 'intermediate' | 'advanced'>('beginner');
+  const [responseTiming, setResponseTiming] = useState<'normal' | 'fast' | 'slow'>('normal');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
   // Scroll to bottom of messages
@@ -84,6 +85,8 @@ const ChatInterface = ({
     setInput("");
     setIsLoading(true);
     
+    const startTime = Date.now();
+    
     try {
       // Calculate the next sequence numbers
       const nextUserSeq = messages.length + 1;
@@ -111,7 +114,7 @@ const ChatInterface = ({
       }));
       
       // Analyze user response complexity to dynamically adjust difficulty
-      updateUserLevel(userMessage);
+      analyzeUserResponse(userMessage);
       
       // Check if we should evaluate the conversation
       const userMessagesCount = updatedMessages.filter(msg => msg.sender === 'user').length;
@@ -122,7 +125,8 @@ const ChatInterface = ({
         const evaluationResponse = await callSocraticTutor('evaluate', {
           topic,
           conversationHistory,
-          userLevel
+          userLevel,
+          responseTiming
         });
         
         if (typeof evaluationResponse.result !== 'string') {
@@ -159,19 +163,20 @@ const ChatInterface = ({
         const response = await callSocraticTutor('continue', {
           userResponse: userMessage,
           conversationHistory,
-          userLevel
+          userLevel,
+          responseTiming
         });
         
         if (typeof response.result === 'string') {
-          // Check if the response has a feedback section
+          // Parse the response - looking for feedback and question sections
           let feedbackContent = "";
           let questionContent = response.result;
           
-          // Extract feedback and question if the response follows the format
           const feedbackMatch = response.result.match(/FEEDBACK:(.*?)(?=QUESTION:|$)/s);
           const questionMatch = response.result.match(/QUESTION:(.*?)$/s);
           
           if (feedbackMatch && questionMatch) {
+            // We have both feedback and question sections
             feedbackContent = feedbackMatch[1].trim();
             questionContent = questionMatch[1].trim();
             
@@ -180,7 +185,7 @@ const ChatInterface = ({
               sessionId,
               feedbackContent,
               'ai',
-              'question', // Using question type since we don't have a feedback type
+              'feedback',
               nextAiSeq
             );
             
@@ -219,37 +224,77 @@ const ChatInterface = ({
       toast.error("Failed to process your response");
     } finally {
       setIsLoading(false);
+      
+      // Calculate response time and adjust timing category
+      const responseTime = Date.now() - startTime;
+      updateResponseTiming(responseTime);
     }
   };
   
-  // Helper function to update user level based on response complexity
-  const updateUserLevel = (userResponse: string) => {
-    // Simple heuristic for now - can be enhanced later
+  // Helper function to analyze user response and adjust difficulty
+  const analyzeUserResponse = (userResponse: string) => {
+    // Analyze complexity
     const wordCount = userResponse.split(/\s+/).length;
     const complexWords = (userResponse.match(/\b\w{7,}\b/g) || []).length;
     const sentenceCount = (userResponse.match(/[.!?]+/g) || []).length || 1;
+    const conceptualTerms = (userResponse.match(/\b(therefore|however|consequently|furthermore|nevertheless|hypothesis|theory|concept|analysis)\b/gi) || []).length;
     
-    // Calculate a simple complexity score
+    // Calculate complexity metrics
     const avgWordsPerSentence = wordCount / sentenceCount;
     const complexityRatio = complexWords / wordCount;
+    const conceptRatio = conceptualTerms / wordCount;
     
-    if (avgWordsPerSentence > 15 || complexityRatio > 0.2) {
-      setUserLevel('advanced');
-    } else if (avgWordsPerSentence > 8 || complexityRatio > 0.1) {
-      setUserLevel('intermediate');
-    } else {
-      setUserLevel('beginner');
+    // Determine user level based on multiple factors
+    let newLevel: 'beginner' | 'intermediate' | 'advanced' = 'beginner';
+    
+    if ((avgWordsPerSentence > 15 || complexityRatio > 0.2 || conceptRatio > 0.1) && wordCount > 20) {
+      newLevel = 'advanced';
+    } else if ((avgWordsPerSentence > 10 || complexityRatio > 0.15 || conceptRatio > 0.05) && wordCount > 10) {
+      newLevel = 'intermediate';
     }
     
-    console.log(`User response analysis - Level: ${userLevel}, Words: ${wordCount}, Complex words: ${complexWords}, Words per sentence: ${avgWordsPerSentence.toFixed(1)}`);
+    // Only update level if it's higher than current (users can go up but not down)
+    if (userLevel === 'beginner' || 
+        (userLevel === 'intermediate' && newLevel === 'advanced')) {
+      setUserLevel(newLevel);
+    }
+    
+    console.log(`User response analysis - Level: ${newLevel}, Words: ${wordCount}, Complex words: ${complexWords}, Words per sentence: ${avgWordsPerSentence.toFixed(1)}, Concept ratio: ${conceptRatio.toFixed(2)}`);
+  };
+  
+  // Update response timing based on how quickly the user responds
+  const updateResponseTiming = (responseTimeMs: number) => {
+    // Convert to seconds for easier reading
+    const responseTimeSeconds = responseTimeMs / 1000;
+    
+    // Determine timing category
+    let newTiming: 'fast' | 'normal' | 'slow';
+    
+    if (responseTimeSeconds < 10) {
+      newTiming = 'fast';
+    } else if (responseTimeSeconds > 45) {
+      newTiming = 'slow';
+    } else {
+      newTiming = 'normal';
+    }
+    
+    setResponseTiming(newTiming);
+    console.log(`Response timing: ${newTiming} (${responseTimeSeconds.toFixed(1)}s)`);
   };
   
   return (
     <Card className="h-[600px] flex flex-col">
       <CardHeader>
-        <CardTitle className="flex items-center">
-          <MessageSquare className="mr-2 h-5 w-5 text-primary" />
-          Socratic Learning: {topic || "New Session"}
+        <CardTitle className="flex items-center justify-between">
+          <div className="flex items-center">
+            <MessageSquare className="mr-2 h-5 w-5 text-primary" />
+            Socratic Learning: {topic || "New Session"}
+          </div>
+          {userLevel !== 'beginner' && (
+            <Badge variant={userLevel === 'advanced' ? 'default' : 'outline'}>
+              {userLevel === 'advanced' ? 'Advanced' : 'Intermediate'} Level
+            </Badge>
+          )}
         </CardTitle>
       </CardHeader>
       
@@ -320,18 +365,13 @@ const ChatInterface = ({
                 className={`max-w-[80%] rounded-lg p-3 ${
                   message.sender === "user"
                     ? "bg-primary text-primary-foreground"
-                    : message.content.startsWith("FEEDBACK:") 
-                      ? "bg-green-100 dark:bg-green-900" 
+                    : message.message_type === "feedback" 
+                      ? "bg-green-100 dark:bg-green-900/30 border border-green-200 dark:border-green-800" 
                       : "bg-muted"
                 }`}
               >
-                <p>
-                  {/* Display feedback with special formatting */}
-                  {message.sender === "ai" && message.content.startsWith("FEEDBACK:") ? (
-                    <span className="italic text-sm">{message.content.replace("FEEDBACK:", "").trim()}</span>
-                  ) : (
-                    message.content
-                  )}
+                <p className={message.message_type === "feedback" ? "italic text-sm" : ""}>
+                  {message.content}
                 </p>
               </div>
             </div>

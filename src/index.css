@@ -80,7 +80,7 @@
   }
 }
 
-/* Custom CSS animations for intro and site effects */
+/* Enhanced CSS animations for intro and site effects */
 @layer components {
   .gradient-text {
     @apply bg-gradient-to-r from-purple-500 to-blue-500 text-transparent bg-clip-text;
@@ -90,7 +90,7 @@
   .site-intro {
     @apply bg-background/95 backdrop-blur-sm transition-opacity duration-1000;
     animation: fadeOut 1.5s ease-in-out forwards;
-    animation-delay: 2s;
+    animation-delay: 3s;
   }
   
   .site-intro-logo {
@@ -157,5 +157,32 @@
   .animate-on-scroll.visible {
     opacity: 1;
     transform: translateY(0);
+  }
+  
+  /* Individual letter animation */
+  .animate-letter {
+    display: inline-block;
+    transition: transform 0.3s ease;
+  }
+  
+  .animate-letter:hover {
+    transform: translateY(-5px) scale(1.2);
+    color: theme('colors.primary.500');
+  }
+  
+  /* Added animation for ping effect */
+  @keyframes ping {
+    0% {
+      transform: scale(1);
+      opacity: 1;
+    }
+    75%, 100% {
+      transform: scale(2);
+      opacity: 0;
+    }
+  }
+  
+  .animate-ping {
+    animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;
   }
 }

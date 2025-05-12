@@ -53,6 +53,7 @@ const SummarizedNotes = ({ notes }: SummarizedNotesProps) => {
             size="sm" 
             className="h-8 w-8 p-0" 
             onClick={() => setExpanded(!expanded)}
+            title={expanded ? "Collapse" : "Expand"}
           >
             {expanded ? (
               <ArrowUpToLine className="h-4 w-4" />
@@ -65,6 +66,7 @@ const SummarizedNotes = ({ notes }: SummarizedNotesProps) => {
             size="sm" 
             className="h-8 w-8 p-0" 
             onClick={copyToClipboard}
+            title="Copy to clipboard"
           >
             {copied ? (
               <Check className="h-4 w-4 text-green-500" />

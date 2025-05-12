@@ -58,7 +58,7 @@ const DemoSection = () => {
               </div>
               <div className="mt-8">
                 <Button variant="default" className="mr-4" asChild>
-                  <Link to="/demo">Try Demo <ArrowRight className="ml-1 h-4 w-4" /></Link>
+                  <Link to="/learning">Start Learning <ArrowRight className="ml-1 h-4 w-4" /></Link>
                 </Button>
                 <Button variant="outline">Learn More</Button>
               </div>

@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { Tables } from "@/integrations/supabase/types";
 
@@ -593,5 +592,21 @@ export const generateChallengeQuiz = async (
       questions: [],
       timeLimit: 0
     };
+  }
+};
+
+// Add deleteSession function
+export const deleteSession = async (sessionId: string): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('learning_sessions')
+      .delete()
+      .eq('id', sessionId);
+    
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error deleting session:', error);
+    return false;
   }
 };
