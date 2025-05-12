@@ -41,6 +41,8 @@ const SummarizedNotes = ({ topic = "", notes = "", refreshable = true }: Summari
         description: "Please try again later",
         variant: "destructive"
       });
+      // Provide fallback content if API fails
+      setSummaryContent(`• ${topic} is a significant area of study with many important concepts\n\n• Understanding ${topic} requires knowledge of key principles and ideas\n\n• ${topic} has practical applications in various fields`);
     } finally {
       setIsLoading(false);
     }

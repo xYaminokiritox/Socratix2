@@ -33,6 +33,16 @@ const Flashcard = ({ topic = "General Knowledge", numberOfCards = 8 }: Flashcard
     } catch (error) {
       console.error("Error loading flashcards:", error);
       toast.error("Couldn't load flashcards. Please try again.");
+      setFlashcards([
+        { 
+          question: `What is ${topic}?`, 
+          answer: `${topic} is an important subject with many concepts to learn.` 
+        },
+        { 
+          question: `Why is studying ${topic} valuable?`, 
+          answer: `Understanding ${topic} can help you develop critical thinking skills.` 
+        }
+      ]);
     } finally {
       setIsLoading(false);
     }

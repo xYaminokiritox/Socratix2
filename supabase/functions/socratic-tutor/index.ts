@@ -55,7 +55,8 @@ serve(async (req) => {
       messages = [
         {
           role: 'system',
-          content: `Create ${numberOfCards || 8} concise flashcards about "${topic}" for quick review. Each flashcard should capture a key concept.
+          content: `Create ${numberOfCards || 8} specific and informative flashcards about "${topic}". Focus on key concepts, definitions, and important facts.
+          Each flashcard should have a clear question on the front and a concise, accurate answer on the back.
           Return your response in this exact JSON format:
           [
             {
@@ -65,11 +66,11 @@ serve(async (req) => {
             ...
           ]
           
-          Make questions clear and focused on important concepts. Answers should be brief but informative.`
+          Make questions focused and specific to the topic "${topic}". Answers should be brief but informative.`
         },
         {
           role: 'user',
-          content: `Generate ${numberOfCards || 8} flashcards about ${topic}.`
+          content: `Generate ${numberOfCards || 8} flashcards specifically about ${topic}. Cover the most important concepts and facts.`
         }
       ];
     } else if (action === 'generate_summary') {
@@ -77,14 +78,15 @@ serve(async (req) => {
       messages = [
         {
           role: 'system',
-          content: `Create comprehensive but concise summarized notes about "${topic}" for a student. 
+          content: `Create comprehensive but concise summarized notes specifically about "${topic}" for a student. 
           Structure the notes with bullet points, focusing on key concepts, definitions, and important relationships.
-          Include 6-8 main points that would help someone quickly review and understand this topic.
-          Format each point with a bullet (•) and make sure the notes are informative yet concise.`
+          Include 6-8 main points that would help someone quickly review and understand ${topic}.
+          Format each point with a bullet (•) and make sure the notes are informative yet concise.
+          Be specific to the topic "${topic}" and include factual information.`
         },
         {
           role: 'user',
-          content: `Create summarized notes about ${topic}.`
+          content: `Create summarized notes about ${topic}. Include the most important facts and concepts.`
         }
       ];
     } else if (action === 'start') {
