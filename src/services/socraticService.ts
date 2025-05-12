@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { Tables } from "@/integrations/supabase/types";
 
@@ -171,7 +170,7 @@ export const createSession = async (topicPrompt: string): Promise<LearningSessio
 
   const { data, error } = await supabase
     .from("learning_sessions")
-    .insert([{ topic: cleanTopic, raw_prompt: topicPrompt, user_id: user.id }])
+    .insert([{ topic: cleanTopic, user_id: user.id }]) // Removed raw_prompt field
     .select()
     .single();
 

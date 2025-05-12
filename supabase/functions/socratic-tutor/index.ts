@@ -194,7 +194,7 @@ serve(async (req) => {
         }
       ];
     } else {
-      throw new Error('Invalid action specified');
+      throw new Error(`Invalid action specified: ${action}`);
     }
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {

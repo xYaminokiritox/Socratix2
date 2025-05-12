@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -16,7 +15,6 @@ import ChallengeQuiz from "@/components/ChallengeQuiz";
 import { 
   createSession, 
   getSession, 
-  getSessionMessages, 
   updateSessionEvaluation,
   deleteSession,
   getTopicProgress,
@@ -141,7 +139,7 @@ const Learning = () => {
       }
     } catch (error) {
       console.error("Error starting session:", error);
-      toast.error("Failed to start learning session");
+      toast.error("Failed to create learning session");
     } finally {
       setIsLoading(false);
     }
