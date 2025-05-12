@@ -8,7 +8,7 @@ const corsHeaders = {
 };
 
 interface SocraticRequest {
-  action: 'start' | 'continue' | 'evaluate' | 'challenge';
+  action: 'start' | 'continue' | 'evaluate' | 'challenge' | 'extract_topic' | 'generate_flashcards' | 'generate_summary';
   topic?: string;
   sessionId?: string;
   userResponse?: string;
@@ -18,6 +18,8 @@ interface SocraticRequest {
     role: 'system' | 'user' | 'assistant';
     content: string;
   }[];
+  prompt?: string; // Raw user input for topic extraction
+  numberOfCards?: number; // For flashcard generation
 }
 
 serve(async (req) => {
@@ -32,11 +34,60 @@ serve(async (req) => {
       throw new Error('OpenAI API key not found');
     }
 
-    const { action, topic, sessionId, userResponse, conversationHistory, userLevel, responseTiming } = await req.json() as SocraticRequest;
+    const { action, topic, sessionId, userResponse, conversationHistory, userLevel, responseTiming, prompt, numberOfCards } = await req.json() as SocraticRequest;
     
     let messages: { role: string; content: string }[] = [];
     
-    if (action === 'start') {
+    if (action === 'extract_topic') {
+      // Extract clean topic name from user prompt
+      messages = [
+        {
+          role: 'system',
+          content: `Extract the main topic the user wants to learn about from this sentence. Return ONLY the topic name, capitalized appropriately, with no explanation or additional text.`
+        },
+        {
+          role: 'user',
+          content: prompt || ""
+        }
+      ];
+    } else if (action === 'generate_flashcards') {
+      // Generate flashcards for the topic
+      messages = [
+        {
+          role: 'system',
+          content: `Create ${numberOfCards || 8} concise flashcards about "${topic}" for quick review. Each flashcard should capture a key concept.
+          Return your response in this exact JSON format:
+          [
+            {
+              "question": "Question on front of card",
+              "answer": "Concise answer on back of card"
+            },
+            ...
+          ]
+          
+          Make questions clear and focused on important concepts. Answers should be brief but informative.`
+        },
+        {
+          role: 'user',
+          content: `Generate ${numberOfCards || 8} flashcards about ${topic}.`
+        }
+      ];
+    } else if (action === 'generate_summary') {
+      // Generate summarized notes
+      messages = [
+        {
+          role: 'system',
+          content: `Create comprehensive but concise summarized notes about "${topic}" for a student. 
+          Structure the notes with bullet points, focusing on key concepts, definitions, and important relationships.
+          Include 6-8 main points that would help someone quickly review and understand this topic.
+          Format each point with a bullet (•) and make sure the notes are informative yet concise.`
+        },
+        {
+          role: 'user',
+          content: `Create summarized notes about ${topic}.`
+        }
+      ];
+    } else if (action === 'start') {
       // Starting a new Socratic session
       messages = [
         {
@@ -166,14 +217,17 @@ serve(async (req) => {
 
     const result = data.choices[0].message.content;
     
-    // For evaluation or challenge action, parse the response as JSON
+    // For evaluation, challenge, or flashcards action, parse the response as JSON
     let parsedResult = result;
-    if (action === 'evaluate' || action === 'challenge') {
+    if (action === 'evaluate' || action === 'challenge' || action === 'generate_flashcards') {
       try {
         // Extract JSON from the response if it's not already valid JSON
         const jsonMatch = result.match(/\{[\s\S]*\}/);
+        const arrayMatch = result.match(/\[[\s\S]*\]/);
         if (jsonMatch) {
           parsedResult = JSON.parse(jsonMatch[0]);
+        } else if (arrayMatch) {
+          parsedResult = JSON.parse(arrayMatch[0]);
         } else {
           parsedResult = JSON.parse(result);
         }
@@ -187,11 +241,13 @@ serve(async (req) => {
             summary: "Unable to evaluate the conversation.",
             feedback: "Please continue the conversation to receive a more accurate evaluation."
           };
-        } else {
+        } else if (action === 'challenge') {
           parsedResult = {
             questions: [],
             timeLimit: 0
           };
+        } else if (action === 'generate_flashcards') {
+          parsedResult = [];
         }
       }
     }

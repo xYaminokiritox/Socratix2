@@ -4,30 +4,35 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
 import { generateFlashcards } from "@/services/socraticService";
+import { toast } from "sonner";
 
 interface FlashcardProps {
   topic?: string;
+  numberOfCards?: number;
 }
 
-const Flashcard = ({ topic = "General Knowledge" }: FlashcardProps) => {
+const Flashcard = ({ topic = "General Knowledge", numberOfCards = 8 }: FlashcardProps) => {
   const [flashcards, setFlashcards] = useState<{ question: string; answer: string }[]>([]);
   const [currentCard, setCurrentCard] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   
   useEffect(() => {
-    loadFlashcards();
+    if (topic) {
+      loadFlashcards();
+    }
   }, [topic]);
   
   const loadFlashcards = async () => {
     setIsLoading(true);
     try {
-      const cards = await generateFlashcards(topic, 8);
+      const cards = await generateFlashcards(topic, numberOfCards);
       setFlashcards(cards);
       setCurrentCard(0);
       setIsFlipped(false);
     } catch (error) {
       console.error("Error loading flashcards:", error);
+      toast.error("Couldn't load flashcards. Please try again.");
     } finally {
       setIsLoading(false);
     }

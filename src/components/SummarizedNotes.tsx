@@ -1,21 +1,53 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { BookText, Copy, Check, ArrowDownToLine, ArrowUpToLine } from "lucide-react";
+import { BookText, Copy, Check, ArrowDownToLine, ArrowUpToLine, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { generateSummary } from "@/services/socraticService";
 
 interface SummarizedNotesProps {
-  notes: string;
+  topic?: string;
+  notes?: string;
+  refreshable?: boolean;
 }
 
-const SummarizedNotes = ({ notes }: SummarizedNotesProps) => {
+const SummarizedNotes = ({ topic = "", notes = "", refreshable = true }: SummarizedNotesProps) => {
   const { toast } = useToast();
   const [copied, setCopied] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [summaryContent, setSummaryContent] = useState(notes);
+  
+  useEffect(() => {
+    if (topic && !notes) {
+      generateNotesForTopic();
+    } else if (notes) {
+      setSummaryContent(notes);
+    }
+  }, [topic, notes]);
+  
+  const generateNotesForTopic = async () => {
+    if (!topic) return;
+    
+    setIsLoading(true);
+    try {
+      const summary = await generateSummary(topic);
+      setSummaryContent(summary);
+    } catch (error) {
+      console.error("Error generating summary notes:", error);
+      toast({
+        title: "Failed to generate notes",
+        description: "Please try again later",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
   
   const copyToClipboard = () => {
-    navigator.clipboard.writeText(notes);
+    navigator.clipboard.writeText(summaryContent);
     setCopied(true);
     toast({
       title: "Copied to clipboard",
@@ -38,7 +70,13 @@ const SummarizedNotes = ({ notes }: SummarizedNotesProps) => {
     return notes;
   };
   
-  const formattedNotes = formatNotes(notes);
+  const formattedNotes = formatNotes(summaryContent);
+  
+  const handleRefresh = () => {
+    if (topic) {
+      generateNotesForTopic();
+    }
+  };
   
   return (
     <Card>
@@ -48,6 +86,18 @@ const SummarizedNotes = ({ notes }: SummarizedNotesProps) => {
           Summarized Notes
         </CardTitle>
         <div className="flex items-center space-x-1">
+          {refreshable && (
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="h-8 w-8 p-0" 
+              onClick={handleRefresh}
+              disabled={isLoading}
+              title="Refresh notes"
+            >
+              <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+            </Button>
+          )}
           <Button 
             variant="ghost" 
             size="sm" 
@@ -78,19 +128,25 @@ const SummarizedNotes = ({ notes }: SummarizedNotesProps) => {
       </CardHeader>
       
       <CardContent className={`p-4 ${expanded ? 'max-h-[600px]' : 'max-h-[250px]'} overflow-y-auto transition-all duration-300`}>
-        <div className="prose prose-sm max-w-none dark:prose-invert">
-          {formattedNotes.split('\n').map((line, index) => (
-            line.trim() ? (
-              <p key={index} className="mb-2 last:mb-0 text-sm">
-                {line.startsWith('•') ? (
-                  <span>
-                    <span className="text-primary font-medium">•</span> {line.substring(1).trim()}
-                  </span>
-                ) : line}
-              </p>
-            ) : <br key={index} />
-          ))}
-        </div>
+        {isLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full"></div>
+          </div>
+        ) : (
+          <div className="prose prose-sm max-w-none dark:prose-invert">
+            {formattedNotes.split('\n').map((line, index) => (
+              line.trim() ? (
+                <p key={index} className="mb-2 last:mb-0 text-sm">
+                  {line.startsWith('•') ? (
+                    <span>
+                      <span className="text-primary font-medium">•</span> {line.substring(1).trim()}
+                    </span>
+                  ) : line}
+                </p>
+              ) : <br key={index} />
+            ))}
+          </div>
+        )}
       </CardContent>
     </Card>
   );
