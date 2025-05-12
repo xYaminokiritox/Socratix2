@@ -19,7 +19,7 @@ const Index = () => {
     // Hide intro animation after delay
     const introTimer = setTimeout(() => {
       setIntroVisible(false);
-    }, 2000);
+    }, 3000); // Extended time for smoother transition
 
     // Add scroll event listener for animations and progress tracking
     const handleScroll = () => {
@@ -57,12 +57,14 @@ const Index = () => {
   return (
     <ThemeProvider defaultTheme="light">
       <div className="min-h-screen overflow-hidden relative">
-        {/* Site intro animation */}
+        {/* Enhanced site intro animation */}
         {introVisible && (
-          <div className="site-intro">
-            <div className="site-intro-logo">
-              <div className="text-4xl md:text-6xl font-bold gradient-text mb-4">Socratix</div>
-              <div className="text-lg text-muted-foreground">Learning through discovery</div>
+          <div className="site-intro fixed inset-0 flex items-center justify-center z-50 bg-background">
+            <div className="site-intro-logo transform transition-all duration-1000 ease-in-out animate-pulse">
+              <div className="text-4xl md:text-6xl font-bold gradient-text mb-4 animate-float">Socratix</div>
+              <div className="text-lg text-muted-foreground transition-opacity duration-1000 delay-500 opacity-0 animate-fade-in">
+                Learning through discovery
+              </div>
             </div>
           </div>
         )}
@@ -78,8 +80,8 @@ const Index = () => {
         />
         
         {/* Subtle decorative element - more refined */}
-        <div className="fixed inset-0 pointer-events-none z-[-1] opacity-10">
-          <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_50%_50%,rgba(139,92,246,0.03),transparent_70%)]"></div>
+        <div className="fixed inset-0 pointer-events-none z-[-1]">
+          <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_50%_50%,rgba(139,92,246,0.08),transparent_70%)]"></div>
         </div>
         
         <Header />

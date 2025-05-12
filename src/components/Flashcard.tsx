@@ -1,117 +1,140 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, ArrowRight, Book } from "lucide-react";
+import { ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
+import { generateFlashcards } from "@/services/socraticService";
 
-const demoFlashcards = [
-  {
-    id: 1,
-    question: "What is the Socratic method?",
-    answer: "The Socratic method is a form of cooperative argumentative dialogue between individuals, based on asking and answering questions to stimulate critical thinking and to draw out ideas and underlying presuppositions."
-  },
-  {
-    id: 2,
-    question: "Why is active learning more effective than passive learning?",
-    answer: "Active learning engages students in the learning process through activities, discussions, and reflections, resulting in better retention and understanding compared to passive learning, which is primarily one-way transmission of information."
-  },
-  {
-    id: 3,
-    question: "What are the key components of effective questioning?",
-    answer: "The key components include open-ended questions, wait time for reflection, follow-up questions, and questions that promote critical thinking rather than simple recall."
-  }
-];
+interface FlashcardProps {
+  topic?: string;
+}
 
-const Flashcard = () => {
-  const [currentCardIndex, setCurrentCardIndex] = useState(0);
+const Flashcard = ({ topic = "General Knowledge" }: FlashcardProps) => {
+  const [flashcards, setFlashcards] = useState<{ question: string; answer: string }[]>([]);
+  const [currentCard, setCurrentCard] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   
-  const currentCard = demoFlashcards[currentCardIndex];
+  useEffect(() => {
+    loadFlashcards();
+  }, [topic]);
+  
+  const loadFlashcards = async () => {
+    setIsLoading(true);
+    try {
+      const cards = await generateFlashcards(topic, 8);
+      setFlashcards(cards);
+      setCurrentCard(0);
+      setIsFlipped(false);
+    } catch (error) {
+      console.error("Error loading flashcards:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
   
   const handleNext = () => {
-    setIsFlipped(false);
-    setTimeout(() => {
-      setCurrentCardIndex((prev) => (prev + 1) % demoFlashcards.length);
-    }, 200);
+    if (currentCard < flashcards.length - 1) {
+      setCurrentCard(currentCard + 1);
+      setIsFlipped(false);
+    }
   };
   
-  const handlePrevious = () => {
-    setIsFlipped(false);
-    setTimeout(() => {
-      setCurrentCardIndex((prev) => (prev - 1 + demoFlashcards.length) % demoFlashcards.length);
-    }, 200);
+  const handlePrev = () => {
+    if (currentCard > 0) {
+      setCurrentCard(currentCard - 1);
+      setIsFlipped(false);
+    }
   };
   
-  const toggleFlip = () => {
+  const handleFlip = () => {
     setIsFlipped(!isFlipped);
   };
   
+  const handleRefresh = () => {
+    loadFlashcards();
+  };
+  
+  if (isLoading) {
+    return (
+      <Card className="relative h-[200px]">
+        <CardContent className="flex items-center justify-center h-full">
+          <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full"></div>
+        </CardContent>
+      </Card>
+    );
+  }
+  
+  if (flashcards.length === 0) {
+    return (
+      <Card className="relative h-[200px]">
+        <CardContent className="flex items-center justify-center h-full">
+          <div className="text-center">
+            <p className="mb-2">No flashcards available.</p>
+            <Button size="sm" onClick={handleRefresh}>Try Again</Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+  
   return (
-    <Card className="overflow-hidden">
-      <CardHeader className="bg-primary/5 py-3">
-        <CardTitle className="flex items-center text-base">
-          <Book className="mr-2 h-4 w-4 text-primary" />
-          Flashcards
-        </CardTitle>
-      </CardHeader>
-      
-      <div className="px-4 py-2 text-xs text-muted-foreground flex justify-between">
-        <span>Card {currentCardIndex + 1} of {demoFlashcards.length}</span>
-        <span>Tap card to flip</span>
-      </div>
-      
-      <CardContent className="p-4">
-        <div 
-          className="h-[200px] cursor-pointer"
-          onClick={toggleFlip}
-        >
-          <div
-            className="relative w-full h-full transition-transform duration-500 transform-style-3d"
-            style={{
-              transformStyle: "preserve-3d",
-              transform: isFlipped ? "rotateY(180deg)" : "rotateY(0deg)",
-            }}
-          >
-            {/* Front side - Question */}
-            <div
-              className="absolute inset-0 flex items-center justify-center p-4 backface-hidden rounded-lg border bg-card"
-              style={{
-                backfaceVisibility: "hidden",
-              }}
-            >
-              <p className="text-center font-medium">{currentCard.question}</p>
-            </div>
-            
-            {/* Back side - Answer */}
-            <div
-              className="absolute inset-0 flex items-center justify-center p-4 backface-hidden rounded-lg border bg-primary/5"
-              style={{
-                backfaceVisibility: "hidden",
-                transform: "rotateY(180deg)",
-              }}
-            >
-              <p className="text-center text-sm">{currentCard.answer}</p>
+    <Card className="relative h-[240px]">
+      <CardContent className="p-0 h-full">
+        <div className="flex items-center justify-between p-3 border-b">
+          <div className="text-sm font-medium flex items-center">
+            Flashcards: <span className="ml-1 text-muted-foreground">{topic}</span>
+          </div>
+          <div className="flex items-center space-x-1">
+            <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={handleRefresh}>
+              <RefreshCw className="h-4 w-4" />
+            </Button>
+            <div className="text-xs text-muted-foreground">
+              {currentCard + 1}/{flashcards.length}
             </div>
           </div>
         </div>
+        
+        <div 
+          className="p-5 h-[150px] flex items-center justify-center cursor-pointer"
+          onClick={handleFlip}
+        >
+          <div 
+            className="w-full h-full flex items-center justify-center transition-all duration-300"
+            style={{ transform: isFlipped ? "rotateX(180deg)" : "rotateX(0)" }}
+          >
+            <div className={`absolute w-full text-center transition-opacity duration-300 ${isFlipped ? 'opacity-0' : 'opacity-100'}`}>
+              <p className="text-lg font-medium">{flashcards[currentCard].question}</p>
+              <p className="text-xs text-muted-foreground mt-2">Click to reveal answer</p>
+            </div>
+            <div className={`absolute w-full text-center transition-opacity duration-300 ${isFlipped ? 'opacity-100' : 'opacity-0'}`} 
+                 style={{ transform: "rotateX(180deg)" }}>
+              <p className="text-lg">{flashcards[currentCard].answer}</p>
+            </div>
+          </div>
+        </div>
+        
+        <div className="absolute bottom-0 left-0 right-0 flex justify-between p-3 border-t">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={handlePrev}
+            disabled={currentCard === 0}
+          >
+            <ChevronLeft className="h-4 w-4 mr-1" />
+            Prev
+          </Button>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={handleNext}
+            disabled={currentCard === flashcards.length - 1}
+          >
+            Next
+            <ChevronRight className="h-4 w-4 ml-1" />
+          </Button>
+        </div>
       </CardContent>
-      
-      <CardFooter className="flex justify-between border-t p-2">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handlePrevious}
-        >
-          <ArrowLeft className="h-4 w-4 mr-1" /> Previous
-        </Button>
-        <Button
-          variant="outline" 
-          size="sm"
-          onClick={handleNext}
-        >
-          Next <ArrowRight className="h-4 w-4 ml-1" />
-        </Button>
-      </CardFooter>
     </Card>
   );
 };

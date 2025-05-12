@@ -11,6 +11,7 @@ export interface SocraticResponse {
     completed: boolean;
     confidence_score: number;
     summary: string;
+    feedback?: string; // Added feedback field for user response evaluation
   };
 }
 
@@ -68,6 +69,27 @@ export const AVAILABLE_BADGES: Badge[] = [
     description: "Explored multiple topics",
     image: "🔍",
     criteria: "Study 3 different topics"
+  },
+  {
+    id: "focused_learner",
+    name: "Focused Learner",
+    description: "Answered 5 questions in a row correctly",
+    image: "🎯",
+    criteria: "Answer 5 questions correctly in a single session"
+  },
+  {
+    id: "critical_thinker",
+    name: "Critical Thinker",
+    description: "Used higher-order thinking in your answers",
+    image: "💭",
+    criteria: "Demonstrate critical thinking skills in your responses"
+  },
+  {
+    id: "quiz_master",
+    name: "Quiz Master",
+    description: "Performed well in Challenge Mode quizzes",
+    image: "🏆",
+    criteria: "Get 90%+ score on a Challenge Mode quiz"
   }
 ];
 
@@ -88,6 +110,22 @@ export const AVAILABLE_ACHIEVEMENTS: Achievement[] = [
     image: "📚",
     linkedinTitle: "Consistent Learner Achievement on Socratix",
     linkedinDescription: "Demonstrated dedication to continuous learning through daily study sessions."
+  },
+  {
+    id: "speed_learner",
+    name: "Speed Learner",
+    description: "Mastered a topic in record time",
+    image: "⏱️",
+    linkedinTitle: "Speed Learner Achievement on Socratix",
+    linkedinDescription: "Demonstrated exceptional ability to quickly master complex topics."
+  },
+  {
+    id: "challenge_champion",
+    name: "Challenge Champion",
+    description: "Completed 10 Challenge Mode quizzes with perfect scores",
+    image: "🎮",
+    linkedinTitle: "Challenge Champion on Socratix",
+    linkedinDescription: "Demonstrated mastery by completing 10 timed quizzes with perfect scores."
   }
 ];
 
@@ -270,12 +308,13 @@ export const updateSessionEvaluation = async (
 
 // Function to call the Socratic tutor edge function
 export const callSocraticTutor = async (
-  action: 'start' | 'continue' | 'evaluate',
+  action: 'start' | 'continue' | 'evaluate' | 'challenge',
   params: {
     topic?: string;
     sessionId?: string;
     userResponse?: string;
     conversationHistory?: { role: 'system' | 'user' | 'assistant'; content: string }[];
+    userLevel?: 'beginner' | 'intermediate' | 'advanced';
   }
 ): Promise<SocraticResponse> => {
   const { data, error } = await supabase.functions.invoke('socratic-tutor', {
@@ -321,6 +360,34 @@ const saveUserAchievementsToStorage = (userId: string, achievements: {id: string
   localStorage.setItem(key, JSON.stringify(achievements));
 };
 
+// Helper function to get user's points from localStorage
+const getUserPointsFromStorage = (userId: string): number => {
+  const key = `user_points_${userId}`;
+  const storedPoints = localStorage.getItem(key);
+  return storedPoints ? parseInt(storedPoints) : 0;
+};
+
+// Helper function to save user's points to localStorage
+const saveUserPointsToStorage = (userId: string, points: number) => {
+  const key = `user_points_${userId}`;
+  localStorage.setItem(key, points.toString());
+};
+
+// Function to award points to a user
+export const awardPoints = async (userId: string, points: number): Promise<boolean> => {
+  try {
+    const currentPoints = getUserPointsFromStorage(userId);
+    const newPoints = currentPoints + points;
+    saveUserPointsToStorage(userId, newPoints);
+    
+    console.log(`Awarded ${points} points to user ${userId}, total now: ${newPoints}`);
+    return true;
+  } catch (error) {
+    console.error("Error awarding points:", error);
+    return false;
+  }
+};
+
 // Function to award a badge to a user
 export const awardBadge = async (userId: string, badgeId: string): Promise<boolean> => {
   try {
@@ -335,6 +402,9 @@ export const awardBadge = async (userId: string, badgeId: string): Promise<boole
     // Award the new badge
     userBadges.push(badgeId);
     saveUserBadgesToStorage(userId, userBadges);
+    
+    // Award points for getting a badge
+    await awardPoints(userId, 25);
     
     console.log(`Badge ${badgeId} awarded to user ${userId}`);
     return true;
@@ -358,6 +428,9 @@ export const awardAchievement = async (userId: string, achievementId: string, to
     // Award the new achievement
     userAchievements.push({ id: achievementId, topic });
     saveUserAchievementsToStorage(userId, userAchievements);
+    
+    // Award points for getting an achievement
+    await awardPoints(userId, 100);
     
     console.log(`Achievement ${achievementId} awarded to user ${userId} for topic ${topic}`);
     return true;
@@ -409,22 +482,116 @@ export const getUserAchievements = async (userId: string): Promise<(Achievement 
 // Function to get user's points
 export const getUserPoints = async (userId: string): Promise<number> => {
   try {
-    const { data: sessions } = await supabase
-      .from("learning_sessions")
-      .select("confidence_score")
-      .eq("user_id", userId)
-      .eq("completed", true);
-    
-    if (!sessions) return 0;
-    
-    // Calculate points: 10 points per completed session plus bonus points based on confidence score
-    return sessions.reduce((total, session) => {
-      const basePoints = 10;
-      const confidenceBonus = session.confidence_score ? Math.floor(session.confidence_score / 10) : 0;
-      return total + basePoints + confidenceBonus;
-    }, 0);
+    return getUserPointsFromStorage(userId);
   } catch (error) {
-    console.error("Error calculating user points:", error);
+    console.error("Error retrieving user points:", error);
     return 0;
+  }
+};
+
+// Function to generate flashcards for a topic
+export const generateFlashcards = async (
+  topic: string,
+  numberOfCards: number = 5
+): Promise<{ question: string; answer: string }[]> => {
+  try {
+    // In a real app, we would call an AI service to generate these
+    // For the demo, we'll return some hardcoded flashcards based on the topic
+    const genericFlashcards = [
+      { question: `What is the main concept of ${topic}?`, answer: `${topic} is a field that focuses on understanding and application of key principles.` },
+      { question: `Who is considered the founder of ${topic}?`, answer: `While many contributed to ${topic}, it was formalized in the early studies.` },
+      { question: `When did ${topic} first become widely recognized?`, answer: `${topic} gained significant attention in the academic community in recent decades.` },
+      { question: `Why is ${topic} important?`, answer: `${topic} provides foundational understanding for many applications in related fields.` },
+      { question: `What are the key components of ${topic}?`, answer: `The key components include theoretical frameworks, practical applications, and analytical methods.` },
+    ];
+    
+    return genericFlashcards.slice(0, numberOfCards);
+  } catch (error) {
+    console.error("Error generating flashcards:", error);
+    return [];
+  }
+};
+
+// Function to generate a challenge quiz
+export const generateChallengeQuiz = async (
+  topic: string,
+  numberOfQuestions: number = 5
+): Promise<{
+  questions: {
+    question: string;
+    options: string[];
+    correctAnswer: number;
+  }[];
+  timeLimit: number;
+}> => {
+  try {
+    // In a real app, we would call an AI service to generate these
+    // For the demo, we'll return some hardcoded questions based on the topic
+    const genericQuestions = [
+      {
+        question: `Which of the following best describes ${topic}?`,
+        options: [
+          `A systematic approach to understanding ${topic.toLowerCase()}`,
+          `A random collection of facts about ${topic.toLowerCase()}`,
+          `A philosophy opposed to ${topic.toLowerCase()}`,
+          `A mathematical model unrelated to ${topic.toLowerCase()}`
+        ],
+        correctAnswer: 0
+      },
+      {
+        question: `What is a key principle of ${topic}?`,
+        options: [
+          `Avoiding all practical applications`,
+          `Focusing only on theoretical frameworks`,
+          `Integration of theory and practice`,
+          `Rejecting established knowledge`
+        ],
+        correctAnswer: 2
+      },
+      {
+        question: `Which field is most closely related to ${topic}?`,
+        options: [
+          `Ancient literature`,
+          `Modern applications of ${topic.toLowerCase()}`,
+          `Unrelated scientific disciplines`,
+          `Purely fictional concepts`
+        ],
+        correctAnswer: 1
+      },
+      {
+        question: `What approach is typically used when studying ${topic}?`,
+        options: [
+          `Random guessing`,
+          `Memorization without understanding`,
+          `Analytical thinking and critical analysis`,
+          `Avoiding all theoretical frameworks`
+        ],
+        correctAnswer: 2
+      },
+      {
+        question: `Which of the following is NOT typically associated with ${topic}?`,
+        options: [
+          `Systematic research`,
+          `Thoughtful analysis`,
+          `Evidence-based conclusions`,
+          `Arbitrary assumptions without evidence`
+        ],
+        correctAnswer: 3
+      }
+    ];
+    
+    // Set a time limit of 30 seconds per question
+    const timeLimit = numberOfQuestions * 30;
+    
+    return {
+      questions: genericQuestions.slice(0, numberOfQuestions),
+      timeLimit
+    };
+  } catch (error) {
+    console.error("Error generating challenge quiz:", error);
+    return {
+      questions: [],
+      timeLimit: 0
+    };
   }
 };

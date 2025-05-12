@@ -5,18 +5,19 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { ArrowUp, Book, BookOpen, MessageSquare } from "lucide-react";
+import { ArrowUp, Book, BookOpen, MessageSquare, Timer } from "lucide-react";
 import Header from "@/components/Header";
 import NotesUploader from "@/components/NotesUploader";
 import ChatInterface from "@/components/ChatInterface";
 import Flashcard from "@/components/Flashcard";
 import SummarizedNotes from "@/components/SummarizedNotes";
 import UserProgress from "@/components/UserProgress";
-import { createSession, getUserBadges, getUserAchievements, Badge, Achievement } from "@/services/socraticService";
+import { createSession, getUserBadges, getUserAchievements, Badge, Achievement, awardPoints } from "@/services/socraticService";
 import AchievementShare from "@/components/AchievementShare";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
+import ChallengeQuiz from "@/components/ChallengeQuiz";
 
 const Demo = () => {
   const { toast: hookToast } = useToast();
@@ -36,6 +37,7 @@ const Demo = () => {
   } | null>(null);
   const [newBadge, setNewBadge] = useState<Badge | null>(null);
   const [newAchievement, setNewAchievement] = useState<(Achievement & {topic: string}) | null>(null);
+  const [showChallengeMode, setShowChallengeMode] = useState(false);
   
   const [initialBadgeCount, setInitialBadgeCount] = useState(0);
   const [initialAchievementCount, setInitialAchievementCount] = useState(0);
@@ -127,17 +129,19 @@ const Demo = () => {
       
       setSessionId(newSession.id);
       
-      // Generate fake summarized notes if we have a topic or notes
+      // Generate summarized notes if we have a topic or notes
       if (notes) {
         setSummarizedNotes(notes);
       } else {
         setSummarizedNotes(
           `Here are your summarized notes on ${actualTopic}:\n\n` +
-          `• ${actualTopic} is a fascinating subject with many applications\n` +
-          `• Learning about ${actualTopic} involves understanding key concepts\n` +
-          `• The principles of ${actualTopic} were first established in the early studies\n` +
-          `• Modern applications of ${actualTopic} include various technological advancements\n` +
-          `• Several theories exist to explain the foundation of ${actualTopic}`
+          `• ${actualTopic} is a fascinating subject with many applications\n\n` +
+          `• Learning about ${actualTopic} involves understanding key concepts and principles\n\n` +
+          `• The foundations of ${actualTopic} were established through rigorous research and study\n\n` +
+          `• Modern applications of ${actualTopic} include technological advancements and practical implementations\n\n` +
+          `• Several theories exist to explain the foundational mechanisms of ${actualTopic}\n\n` +
+          `• Understanding ${actualTopic} requires both theoretical knowledge and practical application\n\n` +
+          `• Recent developments in ${actualTopic} have opened new avenues for exploration and discovery`
         );
       }
       
@@ -145,6 +149,11 @@ const Demo = () => {
       
       // Start with initial progress
       setLearningProgress(5);
+      
+      // Award some initial points for starting a session
+      if (session?.user) {
+        await awardPoints(session.user.id, 10);
+      }
       
       // Simulate progress increase as user engages
       const progressInterval = setInterval(() => {
@@ -174,6 +183,16 @@ const Demo = () => {
     // Set final progress based on evaluation
     if (result.confidence_score) {
       setLearningProgress(result.confidence_score);
+    }
+  };
+  
+  const handleChallengeComplete = (score: number) => {
+    setShowChallengeMode(false);
+    toast.success(`Challenge completed with ${score}% score!`);
+    
+    // Award additional points based on challenge performance
+    if (session?.user) {
+      awardPoints(session.user.id, Math.floor(score / 2));
     }
   };
   
@@ -249,17 +268,41 @@ const Demo = () => {
                 </Card>
               )}
               
-              <ChatInterface 
-                sessionId={sessionId}
-                topic={topic || "Notes Analysis"}
-                onEvaluationComplete={handleEvaluationComplete}
-              />
+              {showChallengeMode ? (
+                <ChallengeQuiz 
+                  topic={topic || "General Knowledge"} 
+                  onComplete={handleChallengeComplete} 
+                />
+              ) : (
+                <ChatInterface 
+                  sessionId={sessionId}
+                  topic={topic || "Notes Analysis"}
+                  onEvaluationComplete={handleEvaluationComplete}
+                />
+              )}
+              
+              {/* Challenge Mode Button */}
+              {evaluation?.completed && !showChallengeMode && (
+                <div className="mt-4 flex justify-center">
+                  <Button 
+                    onClick={() => setShowChallengeMode(true)}
+                    variant="outline"
+                    className="group relative overflow-hidden"
+                  >
+                    <div className="absolute inset-0 bg-gradient-to-r from-yellow-500/30 to-amber-500/30 opacity-50 group-hover:opacity-70 transition-opacity"></div>
+                    <span className="relative flex items-center">
+                      <Timer className="mr-2 h-4 w-4" />
+                      Challenge Me!
+                    </span>
+                  </Button>
+                </div>
+              )}
             </div>
             
             <div className="space-y-6">
               <UserProgress />
               
-              <Flashcard />
+              <Flashcard topic={topic || "General Knowledge"} />
               
               <SummarizedNotes notes={summarizedNotes} />
               
@@ -274,6 +317,7 @@ const Demo = () => {
                     setSummarizedNotes("");
                     setSessionId(null);
                     setEvaluation(null);
+                    setShowChallengeMode(false);
                     setLearningProgress(0);
                   }}
                 >

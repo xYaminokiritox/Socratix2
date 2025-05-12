@@ -1,6 +1,6 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { BookText, Copy, Check } from "lucide-react";
+import { BookText, Copy, Check, ArrowDownToLine, ArrowUpToLine } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -12,6 +12,7 @@ interface SummarizedNotesProps {
 const SummarizedNotes = ({ notes }: SummarizedNotesProps) => {
   const { toast } = useToast();
   const [copied, setCopied] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   
   const copyToClipboard = () => {
     navigator.clipboard.writeText(notes);
@@ -26,6 +27,19 @@ const SummarizedNotes = ({ notes }: SummarizedNotesProps) => {
     }, 2000);
   };
   
+  const formatNotes = (notes: string) => {
+    // If notes doesn't have bullet points, add them for better readability
+    if (!notes.includes('•')) {
+      const paragraphs = notes.split('\n\n').filter(p => p.trim());
+      if (paragraphs.length > 1) {
+        return paragraphs.map(p => `• ${p}`).join('\n\n');
+      }
+    }
+    return notes;
+  };
+  
+  const formattedNotes = formatNotes(notes);
+  
   return (
     <Card>
       <CardHeader className="bg-primary/5 py-3 flex flex-row items-center justify-between">
@@ -33,23 +47,37 @@ const SummarizedNotes = ({ notes }: SummarizedNotesProps) => {
           <BookText className="mr-2 h-4 w-4 text-primary" />
           Summarized Notes
         </CardTitle>
-        <Button 
-          variant="ghost" 
-          size="sm" 
-          className="h-8 w-8 p-0" 
-          onClick={copyToClipboard}
-        >
-          {copied ? (
-            <Check className="h-4 w-4 text-green-500" />
-          ) : (
-            <Copy className="h-4 w-4" />
-          )}
-        </Button>
+        <div className="flex items-center space-x-1">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="h-8 w-8 p-0" 
+            onClick={() => setExpanded(!expanded)}
+          >
+            {expanded ? (
+              <ArrowUpToLine className="h-4 w-4" />
+            ) : (
+              <ArrowDownToLine className="h-4 w-4" />
+            )}
+          </Button>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="h-8 w-8 p-0" 
+            onClick={copyToClipboard}
+          >
+            {copied ? (
+              <Check className="h-4 w-4 text-green-500" />
+            ) : (
+              <Copy className="h-4 w-4" />
+            )}
+          </Button>
+        </div>
       </CardHeader>
       
-      <CardContent className="p-4 max-h-[350px] overflow-y-auto">
+      <CardContent className={`p-4 ${expanded ? 'max-h-[600px]' : 'max-h-[250px]'} overflow-y-auto transition-all duration-300`}>
         <div className="prose prose-sm max-w-none dark:prose-invert">
-          {notes.split('\n').map((line, index) => (
+          {formattedNotes.split('\n').map((line, index) => (
             line.trim() ? (
               <p key={index} className="mb-2 last:mb-0 text-sm">
                 {line.startsWith('•') ? (

@@ -8,10 +8,11 @@ const corsHeaders = {
 };
 
 interface SocraticRequest {
-  action: 'start' | 'continue' | 'evaluate';
+  action: 'start' | 'continue' | 'evaluate' | 'challenge';
   topic?: string;
   sessionId?: string;
   userResponse?: string;
+  userLevel?: 'beginner' | 'intermediate' | 'advanced';
   conversationHistory?: {
     role: 'system' | 'user' | 'assistant';
     content: string;
@@ -30,7 +31,7 @@ serve(async (req) => {
       throw new Error('OpenAI API key not found');
     }
 
-    const { action, topic, sessionId, userResponse, conversationHistory } = await req.json() as SocraticRequest;
+    const { action, topic, sessionId, userResponse, conversationHistory, userLevel } = await req.json() as SocraticRequest;
     
     let messages: { role: string; content: string }[] = [];
     
@@ -56,15 +57,27 @@ serve(async (req) => {
         throw new Error('Missing conversation history or user response');
       }
       
+      // Adapt difficulty based on user responses
+      const difficultyAdjustment = userLevel ? 
+        `The user appears to be at a ${userLevel} level, so adjust your questions accordingly.` : 
+        'Adapt to the user\'s level of understanding based on their previous responses.';
+      
       messages = [
         ...conversationHistory,
         { role: 'user', content: userResponse },
         {
           role: 'system',
-          content: `Based on the user's response, ask a follow-up question that builds upon their answer. 
-          Your question should push them to think more deeply or consider another aspect of the topic.
-          Keep your response focused only on asking one question. Do not provide answers or lengthy explanations.
-          Return only your question, nothing else.`
+          content: `Based on the user's response, provide:
+          1. Brief feedback on their answer (1-2 sentences evaluating their response and encouraging critical thinking)
+          2. A follow-up question that builds upon their answer
+          
+          ${difficultyAdjustment}
+          
+          Your follow-up question should push them to think more deeply or consider another aspect of the topic.
+          Format your response as: 
+          "FEEDBACK: [Your feedback on their answer]
+          
+          QUESTION: [Your next question]"`
         }
       ];
     } else if (action === 'evaluate') {
@@ -80,10 +93,46 @@ serve(async (req) => {
           Analyze the conversation history and determine:
           1. Has the learner demonstrated a good understanding of ${topic}?
           2. Assign a confidence score from 0-100 indicating how well they've grasped the topic.
-          3. Provide a brief summary (2-3 sentences) of what the learner appears to understand.
-          Return your evaluation in JSON format with three fields: "completed" (boolean), "confidence_score" (number 0-100), and "summary" (string).`
+          3. Provide a brief summary (3-4 sentences) of what the learner appears to understand.
+          4. Include a 1-2 sentence personalized feedback to help them improve further.
+          
+          Return your evaluation in JSON format with these fields: "completed" (boolean), "confidence_score" (number 0-100), "summary" (string), and "feedback" (string).`
         },
         ...conversationHistory
+      ];
+    } else if (action === 'challenge') {
+      // Generate a challenge quiz
+      if (!topic) {
+        throw new Error('Missing topic for challenge');
+      }
+      
+      messages = [
+        {
+          role: 'system',
+          content: `Create a multiple-choice quiz on the topic of "${topic}" with 5 questions.
+          Each question should have 4 options and exactly one correct answer.
+          Make sure the questions test understanding rather than just recall.
+          
+          Return your response in this exact JSON format:
+          {
+            "questions": [
+              {
+                "question": "Question text here",
+                "options": ["Option A", "Option B", "Option C", "Option D"],
+                "correctAnswer": 0
+              },
+              ...
+            ],
+            "timeLimit": 120
+          }
+          
+          The "correctAnswer" field should be the index (0-3) of the correct option.
+          Set a reasonable time limit in seconds for the entire quiz.`
+        },
+        {
+          role: 'user',
+          content: `Please create a challenge quiz about ${topic}.`
+        }
       ];
     } else {
       throw new Error('Invalid action specified');
@@ -109,9 +158,9 @@ serve(async (req) => {
 
     const result = data.choices[0].message.content;
     
-    // For evaluation action, parse the response as JSON
+    // For evaluation or challenge action, parse the response as JSON
     let parsedResult = result;
-    if (action === 'evaluate') {
+    if (action === 'evaluate' || action === 'challenge') {
       try {
         // Extract JSON from the response if it's not already valid JSON
         const jsonMatch = result.match(/\{[\s\S]*\}/);
@@ -121,13 +170,21 @@ serve(async (req) => {
           parsedResult = JSON.parse(result);
         }
       } catch (e) {
-        console.error('Failed to parse evaluation result as JSON:', e);
+        console.error(`Failed to parse ${action} result as JSON:`, e);
         // Provide a fallback structured response
-        parsedResult = {
-          completed: false,
-          confidence_score: 0,
-          summary: "Unable to evaluate the conversation."
-        };
+        if (action === 'evaluate') {
+          parsedResult = {
+            completed: false,
+            confidence_score: 0,
+            summary: "Unable to evaluate the conversation.",
+            feedback: "Please continue the conversation to receive a more accurate evaluation."
+          };
+        } else {
+          parsedResult = {
+            questions: [],
+            timeLimit: 0
+          };
+        }
       }
     }
 

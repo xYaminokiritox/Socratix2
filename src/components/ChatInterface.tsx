@@ -17,6 +17,7 @@ interface ChatInterfaceProps {
     completed: boolean;
     confidence_score: number;
     summary: string;
+    feedback?: string;
   }) => void;
   initialMessages?: ConversationMessage[];
 }
@@ -31,6 +32,7 @@ const ChatInterface = ({
   const [messages, setMessages] = useState<ConversationMessage[]>(initialMessages);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [userLevel, setUserLevel] = useState<'beginner' | 'intermediate' | 'advanced'>('beginner');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
   // Scroll to bottom of messages
@@ -108,6 +110,9 @@ const ChatInterface = ({
         content: msg.content
       }));
       
+      // Analyze user response complexity to dynamically adjust difficulty
+      updateUserLevel(userMessage);
+      
       // Check if we should evaluate the conversation
       const userMessagesCount = updatedMessages.filter(msg => msg.sender === 'user').length;
       const shouldEvaluate = userMessagesCount >= 5;
@@ -116,7 +121,8 @@ const ChatInterface = ({
         // Call AI to evaluate the conversation
         const evaluationResponse = await callSocraticTutor('evaluate', {
           topic,
-          conversationHistory
+          conversationHistory,
+          userLevel
         });
         
         if (typeof evaluationResponse.result !== 'string') {
@@ -152,22 +158,59 @@ const ChatInterface = ({
         // Continue the conversation with next AI question
         const response = await callSocraticTutor('continue', {
           userResponse: userMessage,
-          conversationHistory
+          conversationHistory,
+          userLevel
         });
         
         if (typeof response.result === 'string') {
-          // Save AI's response to the database
-          const aiMessage = await addMessage(
-            sessionId,
-            response.result,
-            'ai',
-            'question',
-            nextAiSeq
-          );
+          // Check if the response has a feedback section
+          let feedbackContent = "";
+          let questionContent = response.result;
           
-          // Update local messages state with AI's response
-          if (aiMessage) {
-            setMessages([...updatedMessages, aiMessage]);
+          // Extract feedback and question if the response follows the format
+          const feedbackMatch = response.result.match(/FEEDBACK:(.*?)(?=QUESTION:|$)/s);
+          const questionMatch = response.result.match(/QUESTION:(.*?)$/s);
+          
+          if (feedbackMatch && questionMatch) {
+            feedbackContent = feedbackMatch[1].trim();
+            questionContent = questionMatch[1].trim();
+            
+            // Add feedback message
+            const feedbackMessage = await addMessage(
+              sessionId,
+              feedbackContent,
+              'ai',
+              'question', // Using question type since we don't have a feedback type
+              nextAiSeq
+            );
+            
+            // Add question message
+            const questionMessage = await addMessage(
+              sessionId,
+              questionContent,
+              'ai',
+              'question',
+              nextAiSeq + 1
+            );
+            
+            // Update local messages state with AI's feedback and next question
+            if (feedbackMessage && questionMessage) {
+              setMessages([...updatedMessages, feedbackMessage, questionMessage]);
+            }
+          } else {
+            // If the response doesn't follow the expected format, just use it as-is
+            const aiMessage = await addMessage(
+              sessionId,
+              response.result,
+              'ai',
+              'question',
+              nextAiSeq
+            );
+            
+            // Update local messages state with AI's response
+            if (aiMessage) {
+              setMessages([...updatedMessages, aiMessage]);
+            }
           }
         }
       }
@@ -177,6 +220,28 @@ const ChatInterface = ({
     } finally {
       setIsLoading(false);
     }
+  };
+  
+  // Helper function to update user level based on response complexity
+  const updateUserLevel = (userResponse: string) => {
+    // Simple heuristic for now - can be enhanced later
+    const wordCount = userResponse.split(/\s+/).length;
+    const complexWords = (userResponse.match(/\b\w{7,}\b/g) || []).length;
+    const sentenceCount = (userResponse.match(/[.!?]+/g) || []).length || 1;
+    
+    // Calculate a simple complexity score
+    const avgWordsPerSentence = wordCount / sentenceCount;
+    const complexityRatio = complexWords / wordCount;
+    
+    if (avgWordsPerSentence > 15 || complexityRatio > 0.2) {
+      setUserLevel('advanced');
+    } else if (avgWordsPerSentence > 8 || complexityRatio > 0.1) {
+      setUserLevel('intermediate');
+    } else {
+      setUserLevel('beginner');
+    }
+    
+    console.log(`User response analysis - Level: ${userLevel}, Words: ${wordCount}, Complex words: ${complexWords}, Words per sentence: ${avgWordsPerSentence.toFixed(1)}`);
   };
   
   return (
@@ -216,6 +281,12 @@ const ChatInterface = ({
                     />
                     
                     <p className="text-sm">{evaluation.summary}</p>
+                    
+                    {evaluation.feedback && (
+                      <div className="mt-2 pt-2 border-t border-dashed border-primary/20">
+                        <p className="text-sm italic">{evaluation.feedback}</p>
+                      </div>
+                    )}
                   </div>
                 </Card>
               );
@@ -249,10 +320,19 @@ const ChatInterface = ({
                 className={`max-w-[80%] rounded-lg p-3 ${
                   message.sender === "user"
                     ? "bg-primary text-primary-foreground"
-                    : "bg-muted"
+                    : message.content.startsWith("FEEDBACK:") 
+                      ? "bg-green-100 dark:bg-green-900" 
+                      : "bg-muted"
                 }`}
               >
-                <p>{message.content}</p>
+                <p>
+                  {/* Display feedback with special formatting */}
+                  {message.sender === "ai" && message.content.startsWith("FEEDBACK:") ? (
+                    <span className="italic text-sm">{message.content.replace("FEEDBACK:", "").trim()}</span>
+                  ) : (
+                    message.content
+                  )}
+                </p>
               </div>
             </div>
           );
