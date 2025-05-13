@@ -170,7 +170,7 @@ export const createSession = async (topicPrompt: string): Promise<LearningSessio
 
   const { data, error } = await supabase
     .from("learning_sessions")
-    .insert([{ topic: cleanTopic, user_id: user.id }]) // Removed raw_prompt field
+    .insert([{ topic: cleanTopic, user_id: user.id }])
     .select()
     .single();
 
