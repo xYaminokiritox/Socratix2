@@ -32,7 +32,7 @@ const SummarizedNotes = ({ topic = "", notes = "", refreshable = true }: Summari
   const generateNotesForTopic = async () => {
     if (!topic) return;
     
-    // Prevent rapid reloading (throttle to once every 10 seconds)
+    // Prevent rapid reloading (throttle to once every 5 seconds)
     const now = Date.now();
     if (now - lastLoadTime < 5000 && loadAttempts > 0) {
       toast({
@@ -65,8 +65,10 @@ const SummarizedNotes = ({ topic = "", notes = "", refreshable = true }: Summari
         variant: "destructive"
       });
       
-      // Provide fallback content if API fails
-      setSummaryContent(`• ${topic} is a significant area of study with many important concepts\n\n• Understanding ${topic} requires knowledge of key principles and ideas\n\n• ${topic} has practical applications in various fields`);
+      // Provide fallback content if API fails, but make it more dynamic
+      if (topic) {
+        setSummaryContent(`• ${topic} is an area of study with various applications and important concepts\n\n• Understanding ${topic} involves learning key principles and methodologies\n\n• ${topic} has significant impact in several fields including science, business, and everyday applications`);
+      }
     } finally {
       setIsLoading(false);
     }

@@ -75,7 +75,8 @@ serve(async (req) => {
     const { action, topic, sessionId, userResponse, conversationHistory, userLevel, responseTiming, prompt, numberOfCards } = await req.json() as SocraticRequest;
     
     let messages: { role: string; content: string }[] = [];
-    let model = 'gpt-4o-mini'; // Default model, more affordable and still powerful
+    // Use OpenAI for chat interactions (Socratic dialog)
+    let model = 'gpt-4o-mini'; // Default model for chat interactions
     
     if (action === 'extract_topic') {
       // Extract clean topic name from user prompt

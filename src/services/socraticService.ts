@@ -247,40 +247,45 @@ export const addMessage = async (
   messageType: 'question' | 'answer' | 'evaluation' | 'feedback',
   sequenceNumber: number
 ): Promise<ConversationMessage | null> => {
-  const { data, error } = await supabase
-    .from("conversation_messages")
-    .insert([{
-      session_id: sessionId,
-      content,
-      sender,
-      message_type: messageType,
-      sequence_number: sequenceNumber
-    }])
-    .select()
-    .single();
+  try {
+    const { data, error } = await supabase
+      .from("conversation_messages")
+      .insert([{
+        session_id: sessionId,
+        content,
+        sender,
+        message_type: messageType,
+        sequence_number: sequenceNumber
+      }])
+      .select()
+      .single();
 
-  if (error) {
+    if (error) {
+      console.error("Error adding message:", error);
+      return null;
+    }
+
+    // If user sends a lot of messages in one session, award the curious_mind badge
+    if (sender === 'user') {
+      const { data: messages } = await supabase
+        .from("conversation_messages")
+        .select("id")
+        .eq("session_id", sessionId)
+        .eq("sender", "user");
+      
+      if (messages && messages.length >= 10) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          await awardBadge(user.id, "curious_mind");
+        }
+      }
+    }
+
+    return data;
+  } catch (error) {
     console.error("Error adding message:", error);
     return null;
   }
-
-  // If user sends a lot of messages in one session, award the curious_mind badge
-  if (sender === 'user') {
-    const { data: messages } = await supabase
-      .from("conversation_messages")
-      .select("id")
-      .eq("session_id", sessionId)
-      .eq("sender", "user");
-    
-    if (messages && messages.length >= 10) {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        await awardBadge(user.id, "curious_mind");
-      }
-    }
-  }
-
-  return data;
 };
 
 // Function to update session with evaluation results
@@ -315,6 +320,9 @@ export const updateSessionEvaluation = async (
         await awardBadge(user.id, "deep_learner");
         await awardAchievement(user.id, "topic_mastery", data.topic);
       }
+      
+      // Update topic-specific progress
+      await updateTopicProgress(user.id, data.topic, confidenceScore);
       
       // Check for multiple topics studied
       const { data: sessions } = await supabase
@@ -366,10 +374,10 @@ export const callSocraticTutor = async (
 // Function to generate flashcards for a topic using AI
 export const generateFlashcards = async (
   topic: string,
-  numberOfCards: number = 8
+  numberOfCards: number = 6
 ): Promise<{ question: string; answer: string }[]> => {
   try {
-    console.log(`Generating ${numberOfCards} flashcards for ${topic}`);
+    console.log(`Generating ${numberOfCards} flashcards for topic: ${topic}`);
     const { data, error } = await supabase.functions.invoke('socratic-tutor', {
       body: {
         action: 'generate_flashcards',
@@ -384,22 +392,18 @@ export const generateFlashcards = async (
     }
 
     if (Array.isArray(data.result) && data.result.length > 0) {
+      console.log(`Successfully loaded flashcards: ${data.result.length}`);
       return data.result;
     }
     
     // Fallback if we don't get a proper array
-    return [
-      { question: `What is ${topic}?`, answer: `${topic} is a subject of study with many important concepts.` },
-      { question: `Why is ${topic} important?`, answer: `${topic} has significant applications in various fields.` },
-      { question: `How can learning about ${topic} benefit someone?`, answer: `Understanding ${topic} can improve critical thinking and problem-solving skills.` }
-    ];
+    throw new Error("Invalid response format from flashcard generation");
   } catch (error) {
     console.error("Error generating flashcards:", error);
     // Return fallback content
     return [
-      { question: `What is ${topic}?`, answer: `${topic} is a subject of study with many important concepts.` },
-      { question: `Why is ${topic} important?`, answer: `${topic} has significant applications in various fields.` },
-      { question: `How can learning about ${topic} benefit someone?`, answer: `Understanding ${topic} can improve critical thinking and problem-solving skills.` }
+      { question: `What is ${topic}?`, answer: `${topic} is a subject with specific concepts and principles that are important to understand.` },
+      { question: `Why is ${topic} significant?`, answer: `${topic} has specific applications and impact in various fields and domains.` }
     ];
   }
 };
@@ -425,52 +429,11 @@ export const generateSummary = async (topic: string): Promise<string> => {
     }
     
     // Fallback
-    return `• ${topic} is an important field of study with various applications\n\n• Understanding ${topic} requires knowledge of fundamental principles and concepts\n\n• ${topic} has practical applications in many professional fields\n\n• Learning ${topic} develops critical thinking and analytical skills\n\n• ${topic} continues to evolve with new research and discoveries`;
+    throw new Error("Empty or invalid response from summary generation");
   } catch (error) {
     console.error("Error generating summary:", error);
-    return `• ${topic} is an important field of study with various applications\n\n• Understanding ${topic} requires knowledge of fundamental principles and concepts\n\n• ${topic} has practical applications in many professional fields\n\n• Learning ${topic} develops critical thinking and analytical skills\n\n• ${topic} continues to evolve with new research and discoveries`;
+    return `• ${topic} is a specific field with unique characteristics and principles\n\n• Learning ${topic} involves understanding several key concepts that build upon each other\n\n• ${topic} has particular real-world applications that demonstrate its importance`;
   }
-};
-
-// Gamification functions
-
-// Helper function to get user's badges from localStorage
-const getUserBadgesFromStorage = (userId: string): string[] => {
-  const key = `user_badges_${userId}`;
-  const storedBadges = localStorage.getItem(key);
-  return storedBadges ? JSON.parse(storedBadges) : [];
-};
-
-// Helper function to save user's badges to localStorage
-const saveUserBadgesToStorage = (userId: string, badges: string[]) => {
-  const key = `user_badges_${userId}`;
-  localStorage.setItem(key, JSON.stringify(badges));
-};
-
-// Helper function to get user's achievements from localStorage
-const getUserAchievementsFromStorage = (userId: string): {id: string, topic: string}[] => {
-  const key = `user_achievements_${userId}`;
-  const storedAchievements = localStorage.getItem(key);
-  return storedAchievements ? JSON.parse(storedAchievements) : [];
-};
-
-// Helper function to save user's achievements to localStorage
-const saveUserAchievementsToStorage = (userId: string, achievements: {id: string, topic: string}[]) => {
-  const key = `user_achievements_${userId}`;
-  localStorage.setItem(key, JSON.stringify(achievements));
-};
-
-// Helper function to get user's points from localStorage
-const getUserPointsFromStorage = (userId: string): number => {
-  const key = `user_points_${userId}`;
-  const storedPoints = localStorage.getItem(key);
-  return storedPoints ? parseInt(storedPoints) : 0;
-};
-
-// Helper function to save user's points to localStorage
-const saveUserPointsToStorage = (userId: string, points: number) => {
-  const key = `user_points_${userId}`;
-  localStorage.setItem(key, points.toString());
 };
 
 // Helper function to get topic-specific progress from localStorage
@@ -486,6 +449,46 @@ const saveTopicProgressToStorage = (userId: string, topic: string, progress: num
   localStorage.setItem(key, progress.toString());
 };
 
+// Function to update topic progress
+export const updateTopicProgress = async (userId: string, topic: string, progress: number): Promise<boolean> => {
+  try {
+    if (!topic || !userId) return false;
+    
+    // Get current progress (use the highest value)
+    const currentProgress = getTopicProgressFromStorage(userId, topic);
+    const newProgress = Math.max(currentProgress, progress);
+    
+    // Only save if progress has improved
+    if (newProgress > currentProgress) {
+      saveTopicProgressToStorage(userId, topic, newProgress);
+      console.log(`Updated progress for ${topic} to ${newProgress}% for user ${userId}`);
+      
+      // Award points based on progress improvement
+      const pointsEarned = Math.floor((newProgress - currentProgress) / 10) * 5;
+      if (pointsEarned > 0) {
+        await awardPoints(userId, pointsEarned);
+      }
+    }
+    
+    return true;
+  } catch (error) {
+    console.error("Error updating topic progress:", error);
+    return false;
+  }
+};
+
+// Function to get topic progress
+export const getTopicProgress = async (userId: string, topic: string): Promise<number> => {
+  if (!topic || !userId) return 0;
+  
+  try {
+    return getTopicProgressFromStorage(userId, topic);
+  } catch (error) {
+    console.error("Error getting topic progress:", error);
+    return 0;
+  }
+};
+
 // Function to award points to a user
 export const awardPoints = async (userId: string, points: number): Promise<boolean> => {
   try {
@@ -498,32 +501,6 @@ export const awardPoints = async (userId: string, points: number): Promise<boole
   } catch (error) {
     console.error("Error awarding points:", error);
     return false;
-  }
-};
-
-// Function to update topic progress
-export const updateTopicProgress = async (userId: string, topic: string, progress: number): Promise<boolean> => {
-  try {
-    // Get current progress (use the highest value)
-    const currentProgress = getTopicProgressFromStorage(userId, topic);
-    const newProgress = Math.max(currentProgress, progress);
-    saveTopicProgressToStorage(userId, topic, newProgress);
-    
-    console.log(`Updated progress for ${topic} to ${newProgress}% for user ${userId}`);
-    return true;
-  } catch (error) {
-    console.error("Error updating topic progress:", error);
-    return false;
-  }
-};
-
-// Function to get topic progress
-export const getTopicProgress = async (userId: string, topic: string): Promise<number> => {
-  try {
-    return getTopicProgressFromStorage(userId, topic);
-  } catch (error) {
-    console.error("Error getting topic progress:", error);
-    return 0;
   }
 };
 

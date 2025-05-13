@@ -65,7 +65,7 @@ const Learning = () => {
             // Save progress for this topic
             await updateTopicProgress(session.user.id, sessionData.topic, sessionData.confidence_score);
           } else {
-            setLearningProgress(30); // Default progress for ongoing sessions
+            setLearningProgress(5); // Default progress for ongoing sessions
           }
         }
         
@@ -79,7 +79,7 @@ const Learning = () => {
             setSummarizedNotes(summary);
           } catch (err) {
             console.error("Error generating summary:", err);
-            setSummarizedNotes(`Key points about ${sessionData.topic}:\n\n• ${sessionData.topic} is a fascinating subject with many applications\n\n• Learning about ${sessionData.topic} involves understanding key concepts and principles`);
+            setSummarizedNotes(`• ${sessionData.topic} has key concepts to understand\n\n• ${sessionData.topic} applies to various fields and disciplines\n\n• Learning ${sessionData.topic} builds critical thinking skills`);
           }
         }
         
@@ -127,7 +127,7 @@ const Learning = () => {
         setSummarizedNotes(summary);
       } catch (err) {
         console.error("Error generating summary:", err);
-        setSummarizedNotes(`Key points about ${newSession.topic}:\n\n• ${newSession.topic} is a fascinating subject with many applications\n\n• Learning about ${newSession.topic} involves understanding key concepts and principles`);
+        setSummarizedNotes(`• ${newSession.topic} has key concepts to understand\n\n• ${newSession.topic} applies to various fields and disciplines\n\n• Learning ${newSession.topic} builds critical thinking skills`);
       }
 
       setActiveSession(newSession.id);
@@ -168,9 +168,21 @@ const Learning = () => {
     }
   };
   
-  const handleChallengeComplete = (score: number) => {
+  const handleChallengeComplete = async (score: number) => {
     setShowChallengeMode(false);
+    
+    // Update progress if the score is higher
+    if (score > learningProgress && session?.user && topic) {
+      setLearningProgress(score);
+      await updateTopicProgress(session.user.id, topic, score);
+    }
+    
     toast.success(`Challenge completed with ${score}% score!`);
+    
+    // Award quiz_master badge if score is very high
+    if (score >= 90 && session?.user) {
+      await awardBadge(session.user.id, "quiz_master");
+    }
   };
   
   const handleDeleteSession = async () => {
