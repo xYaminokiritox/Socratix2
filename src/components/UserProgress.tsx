@@ -1,24 +1,32 @@
+
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "./ui/badge";
-import { Trophy, Award, Star } from "lucide-react";
+import { Trophy, Award, Star, BookOpen } from "lucide-react";
 import { 
   getUserBadges, 
   getUserAchievements, 
   getUserPoints,
   Badge as BadgeType,
-  Achievement
+  Achievement,
+  getTopicProgress
 } from "@/services/socraticService";
 import { useAuth } from "@/hooks/useAuth";
 import AchievementShare from "./AchievementShare";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { Progress } from "./ui/progress";
 
+interface TopicProgress {
+  topic: string;
+  progress: number;
+}
+
 const UserProgress = () => {
   const { session } = useAuth();
   const [badges, setBadges] = useState<BadgeType[]>([]);
   const [achievements, setAchievements] = useState<(Achievement & {topic: string})[]>([]);
   const [points, setPoints] = useState(0);
+  const [topicProgresses, setTopicProgresses] = useState<TopicProgress[]>([]);
   const [selectedItem, setSelectedItem] = useState<
     { type: 'badge', item: BadgeType } | 
     { type: 'achievement', item: Achievement & {topic: string} } | 
@@ -42,6 +50,18 @@ const UserProgress = () => {
       setBadges(userBadges);
       setAchievements(userAchievements);
       setPoints(userPoints);
+      
+      // Get unique topics from achievements
+      const uniqueTopics = new Set(userAchievements.map(a => a.topic));
+      
+      // Load progress for each topic the user has studied
+      const topicProgressesPromises = Array.from(uniqueTopics).map(async (topic) => {
+        const progress = await getTopicProgress(userId, topic);
+        return { topic, progress };
+      });
+      
+      const loadedTopicProgresses = await Promise.all(topicProgressesPromises);
+      setTopicProgresses(loadedTopicProgresses);
     } catch (error) {
       console.error("Error loading user progress:", error);
     }
@@ -128,6 +148,30 @@ const UserProgress = () => {
                   <p className="text-xs text-muted-foreground">
                     {levelInfo.nextLevel.pointsNeeded} more points to reach Level {levelInfo.nextLevel.level}
                   </p>
+                </div>
+              )}
+              
+              {/* Topic-specific progress section */}
+              {topicProgresses.length > 0 && (
+                <div className="space-y-2">
+                  <h3 className="flex items-center font-medium text-sm mb-2">
+                    <BookOpen className="h-4 w-4 mr-1" />
+                    Topic Mastery
+                  </h3>
+                  <div className="space-y-3">
+                    {topicProgresses.map((tp, index) => (
+                      <div key={index} className="space-y-1">
+                        <div className="text-xs flex justify-between">
+                          <span className="font-medium">{tp.topic}</span>
+                          <span>{tp.progress}%</span>
+                        </div>
+                        <Progress 
+                          value={tp.progress}
+                          className="h-1.5"
+                        />
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
               

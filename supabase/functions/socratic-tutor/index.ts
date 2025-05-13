@@ -22,6 +22,49 @@ interface SocraticRequest {
   numberOfCards?: number; // For flashcard generation
 }
 
+// Simple delay function to implement retries
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Retry wrapper for OpenAI calls to handle rate limits
+async function callOpenAIWithRetry(url: string, body: any, maxRetries = 3): Promise<Response> {
+  const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
+  if (!openAIApiKey) {
+    throw new Error('OpenAI API key not found');
+  }
+  
+  let lastError;
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${openAIApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      });
+      
+      // If rate limited, wait and retry
+      if (response.status === 429) {
+        const retryAfter = response.headers.get('Retry-After') || '2';
+        const waitTime = parseInt(retryAfter) * 1000 || 2000 * Math.pow(2, attempt);
+        console.log(`Rate limited. Retrying after ${waitTime}ms. Attempt ${attempt + 1}/${maxRetries}`);
+        await delay(waitTime);
+        continue;
+      }
+      
+      return response;
+    } catch (error) {
+      console.error(`Attempt ${attempt + 1} failed:`, error);
+      lastError = error;
+      // Exponential backoff
+      await delay(1000 * Math.pow(2, attempt));
+    }
+  }
+  
+  throw lastError || new Error('Max retries reached');
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -29,14 +72,10 @@ serve(async (req) => {
   }
 
   try {
-    const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
-    if (!openAIApiKey) {
-      throw new Error('OpenAI API key not found');
-    }
-
     const { action, topic, sessionId, userResponse, conversationHistory, userLevel, responseTiming, prompt, numberOfCards } = await req.json() as SocraticRequest;
     
     let messages: { role: string; content: string }[] = [];
+    let model = 'gpt-4o-mini'; // Default model, more affordable and still powerful
     
     if (action === 'extract_topic') {
       // Extract clean topic name from user prompt
@@ -199,24 +238,20 @@ serve(async (req) => {
       throw new Error(`Invalid action specified: ${action}`);
     }
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openAIApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages,
-      }),
+    // Call OpenAI API with retry logic
+    const response = await callOpenAIWithRetry('https://api.openai.com/v1/chat/completions', {
+      model,
+      messages,
+      temperature: 0.7,  // Slightly reduce randomness for more consistent outputs
     });
 
-    const data = await response.json();
-    
     if (!response.ok) {
-      throw new Error(`OpenAI API error: ${data.error?.message || 'Unknown error'}`);
+      const errorData = await response.json();
+      console.error("OpenAI API error:", errorData);
+      throw new Error(`OpenAI API error: ${errorData.error?.message || 'Unknown error'}`);
     }
 
+    const data = await response.json();
     const result = data.choices[0].message.content;
     
     // For evaluation, challenge, or flashcards action, parse the response as JSON
@@ -245,11 +280,26 @@ serve(async (req) => {
           };
         } else if (action === 'challenge') {
           parsedResult = {
-            questions: [],
-            timeLimit: 0
+            questions: [
+              {
+                question: `What is a key concept in ${topic}?`,
+                options: ["Option A", "Option B", "Option C", "Option D"],
+                correctAnswer: 0
+              }
+            ],
+            timeLimit: 60
           };
         } else if (action === 'generate_flashcards') {
-          parsedResult = [];
+          parsedResult = [
+            { 
+              question: `What is ${topic}?`, 
+              answer: `${topic} is an important subject with key concepts and principles.` 
+            },
+            { 
+              question: `Why is ${topic} important?`, 
+              answer: `${topic} has significant applications in many fields.` 
+            }
+          ];
         }
       }
     }
@@ -259,8 +309,22 @@ serve(async (req) => {
     });
   } catch (error) {
     console.error('Error in socratic-tutor function:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
+    
+    // Create a more helpful error response based on the type of error
+    let errorMessage = error.message;
+    let statusCode = 500;
+    
+    // Handle specific error cases
+    if (error.message.includes('rate limit')) {
+      errorMessage = "OpenAI rate limit reached. Please try again in a few moments.";
+      statusCode = 429;
+    } else if (error.message.includes('API key')) {
+      errorMessage = "API key configuration issue. Please check server configuration.";
+      statusCode = 401;
+    }
+    
+    return new Response(JSON.stringify({ error: errorMessage }), {
+      status: statusCode,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }

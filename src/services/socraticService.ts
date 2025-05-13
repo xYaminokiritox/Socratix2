@@ -369,6 +369,7 @@ export const generateFlashcards = async (
   numberOfCards: number = 8
 ): Promise<{ question: string; answer: string }[]> => {
   try {
+    console.log(`Generating ${numberOfCards} flashcards for ${topic}`);
     const { data, error } = await supabase.functions.invoke('socratic-tutor', {
       body: {
         action: 'generate_flashcards',
@@ -382,20 +383,23 @@ export const generateFlashcards = async (
       throw new Error(`Error generating flashcards: ${error.message}`);
     }
 
-    if (Array.isArray(data.result)) {
+    if (Array.isArray(data.result) && data.result.length > 0) {
       return data.result;
     }
     
     // Fallback if we don't get a proper array
     return [
       { question: `What is ${topic}?`, answer: `${topic} is a subject of study with many important concepts.` },
-      { question: `Why is ${topic} important?`, answer: `${topic} has significant applications in various fields.` }
+      { question: `Why is ${topic} important?`, answer: `${topic} has significant applications in various fields.` },
+      { question: `How can learning about ${topic} benefit someone?`, answer: `Understanding ${topic} can improve critical thinking and problem-solving skills.` }
     ];
   } catch (error) {
     console.error("Error generating flashcards:", error);
+    // Return fallback content
     return [
       { question: `What is ${topic}?`, answer: `${topic} is a subject of study with many important concepts.` },
-      { question: `Why is ${topic} important?`, answer: `${topic} has significant applications in various fields.` }
+      { question: `Why is ${topic} important?`, answer: `${topic} has significant applications in various fields.` },
+      { question: `How can learning about ${topic} benefit someone?`, answer: `Understanding ${topic} can improve critical thinking and problem-solving skills.` }
     ];
   }
 };
@@ -403,6 +407,7 @@ export const generateFlashcards = async (
 // Function to generate summarized notes for a topic
 export const generateSummary = async (topic: string): Promise<string> => {
   try {
+    console.log(`Generating summary for ${topic}`);
     const { data, error } = await supabase.functions.invoke('socratic-tutor', {
       body: {
         action: 'generate_summary',
@@ -415,15 +420,15 @@ export const generateSummary = async (topic: string): Promise<string> => {
       throw new Error(`Error generating summary: ${error.message}`);
     }
 
-    if (typeof data.result === 'string') {
+    if (typeof data.result === 'string' && data.result.trim().length > 0) {
       return data.result;
     }
     
     // Fallback
-    return `Here are key points about ${topic}:\n\n• ${topic} is an important field of study\n\n• Understanding ${topic} requires familiarity with core concepts\n\n• ${topic} has practical applications in many areas`;
+    return `• ${topic} is an important field of study with various applications\n\n• Understanding ${topic} requires knowledge of fundamental principles and concepts\n\n• ${topic} has practical applications in many professional fields\n\n• Learning ${topic} develops critical thinking and analytical skills\n\n• ${topic} continues to evolve with new research and discoveries`;
   } catch (error) {
     console.error("Error generating summary:", error);
-    return `Here are key points about ${topic}:\n\n• ${topic} is an important field of study\n\n• Understanding ${topic} requires familiarity with core concepts\n\n• ${topic} has practical applications in many areas`;
+    return `• ${topic} is an important field of study with various applications\n\n• Understanding ${topic} requires knowledge of fundamental principles and concepts\n\n• ${topic} has practical applications in many professional fields\n\n• Learning ${topic} develops critical thinking and analytical skills\n\n• ${topic} continues to evolve with new research and discoveries`;
   }
 };
 

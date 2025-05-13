@@ -18,6 +18,8 @@ const SummarizedNotes = ({ topic = "", notes = "", refreshable = true }: Summari
   const [expanded, setExpanded] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [summaryContent, setSummaryContent] = useState(notes);
+  const [loadAttempts, setLoadAttempts] = useState(0);
+  const [lastLoadTime, setLastLoadTime] = useState(0);
   
   useEffect(() => {
     if (topic && !notes) {
@@ -30,17 +32,39 @@ const SummarizedNotes = ({ topic = "", notes = "", refreshable = true }: Summari
   const generateNotesForTopic = async () => {
     if (!topic) return;
     
+    // Prevent rapid reloading (throttle to once every 10 seconds)
+    const now = Date.now();
+    if (now - lastLoadTime < 5000 && loadAttempts > 0) {
+      toast({
+        title: "Please wait before refreshing",
+        description: "Try again in a few seconds",
+        variant: "default"
+      });
+      return;
+    }
+    
     setIsLoading(true);
+    setLastLoadTime(now);
+    setLoadAttempts(prev => prev + 1);
+    
     try {
+      console.log("Generating summary for topic:", topic);
       const summary = await generateSummary(topic);
-      setSummaryContent(summary);
+      
+      if (summary && summary.length > 0) {
+        setSummaryContent(summary);
+        console.log("Successfully generated summary");
+      } else {
+        throw new Error("Received empty summary");
+      }
     } catch (error) {
       console.error("Error generating summary notes:", error);
       toast({
         title: "Failed to generate notes",
-        description: "Please try again later",
+        description: "Please try again in a moment",
         variant: "destructive"
       });
+      
       // Provide fallback content if API fails
       setSummaryContent(`• ${topic} is a significant area of study with many important concepts\n\n• Understanding ${topic} requires knowledge of key principles and ideas\n\n• ${topic} has practical applications in various fields`);
     } finally {
