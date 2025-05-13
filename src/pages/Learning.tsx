@@ -44,6 +44,9 @@ const Learning = () => {
   const [showChallengeMode, setShowChallengeMode] = useState(false);
   const [learningProgress, setLearningProgress] = useState(0);
   const [activeTab, setActiveTab] = useState("chat");
+  
+  // Track which resources have been loaded
+  const [notesGenerated, setNotesGenerated] = useState(false);
 
   // Load existing session if sessionId is provided
   useEffect(() => {
@@ -73,18 +76,10 @@ const Learning = () => {
           }
         }
         
-        // Load or generate summarized notes
+        // Only load summary if it exists already
         if (sessionData.summary) {
           setSummarizedNotes(sessionData.summary);
-        } else {
-          // Generate new summary for the topic
-          try {
-            const summary = await generateSummary(sessionData.topic);
-            setSummarizedNotes(summary);
-          } catch (err) {
-            console.error("Error generating summary:", err);
-            setSummarizedNotes(`• ${sessionData.topic} has key concepts to understand\n\n• ${sessionData.topic} applies to various fields and disciplines\n\n• Learning ${sessionData.topic} builds critical thinking skills`);
-          }
+          setNotesGenerated(true);
         }
         
         // Set evaluation if session is completed
@@ -124,16 +119,6 @@ const Learning = () => {
       
       // Set the cleaned topic
       setTopic(newSession.topic);
-
-      // Generate initial summary for new topic
-      try {
-        const summary = await generateSummary(newSession.topic);
-        setSummarizedNotes(summary);
-      } catch (err) {
-        console.error("Error generating summary:", err);
-        setSummarizedNotes(`• ${newSession.topic} has key concepts to understand\n\n• ${newSession.topic} applies to various fields and disciplines\n\n• Learning ${newSession.topic} builds critical thinking skills`);
-      }
-
       setActiveSession(newSession.id);
       
       // Start with initial progress
@@ -159,6 +144,7 @@ const Learning = () => {
     // Update summarized notes with evaluation summary
     if (result.summary) {
       setSummarizedNotes(result.summary);
+      setNotesGenerated(true);
     }
     
     // Set final progress based on evaluation
@@ -201,6 +187,28 @@ const Learning = () => {
       } catch (error) {
         console.error("Error deleting session:", error);
         toast.error("Failed to delete session");
+      }
+    }
+  };
+
+  // Handle tab change to generate content when tabs are first accessed
+  const handleTabChange = async (value: string) => {
+    setActiveTab(value);
+    
+    // Generate notes on first notes tab access if they don't exist
+    if (value === "notes" && !notesGenerated && topic) {
+      try {
+        setIsLoading(true);
+        const summary = await generateSummary(topic);
+        if (summary) {
+          setSummarizedNotes(summary);
+          setNotesGenerated(true);
+        }
+      } catch (err) {
+        console.error("Error generating summary:", err);
+        setSummarizedNotes(`• ${topic} has key concepts to understand\n\n• ${topic} applies to various fields and disciplines\n\n• Learning ${topic} builds critical thinking skills`);
+      } finally {
+        setIsLoading(false);
       }
     }
   };
@@ -290,7 +298,7 @@ const Learning = () => {
             
             <div className="grid md:grid-cols-3 gap-6">
               <div className="md:col-span-2">
-                <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
                   <TabsList className="grid grid-cols-4 mb-4">
                     <TabsTrigger value="chat" className="flex items-center gap-1">
                       <MessageSquare className="h-4 w-4" />
@@ -325,7 +333,13 @@ const Learning = () => {
                         <CardDescription>Summarized information about {topic}</CardDescription>
                       </CardHeader>
                       <CardContent>
-                        <SummarizedNotes topic={topic} notes={summarizedNotes} />
+                        <SummarizedNotes 
+                          topic={topic} 
+                          notes={summarizedNotes} 
+                          refreshable={true} 
+                          isGenerated={notesGenerated}
+                          onNotesGenerated={() => setNotesGenerated(true)}
+                        />
                       </CardContent>
                     </Card>
                   </TabsContent>
@@ -337,7 +351,10 @@ const Learning = () => {
                         <CardDescription>Test your knowledge on {topic}</CardDescription>
                       </CardHeader>
                       <CardContent>
-                        <Flashcard topic={topic} />
+                        <Flashcard 
+                          topic={topic} 
+                          loadOnMount={false} 
+                        />
                       </CardContent>
                     </Card>
                   </TabsContent>

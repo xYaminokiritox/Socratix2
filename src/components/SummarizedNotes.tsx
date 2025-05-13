@@ -1,6 +1,6 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { BookText, Copy, Check, ArrowDownToLine, ArrowUpToLine, RefreshCw } from "lucide-react";
+import { BookText, Copy, Check, ArrowDownToLine, ArrowUpToLine, RefreshCw, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -10,9 +10,17 @@ interface SummarizedNotesProps {
   topic?: string;
   notes?: string;
   refreshable?: boolean;
+  isGenerated?: boolean;
+  onNotesGenerated?: () => void;
 }
 
-const SummarizedNotes = ({ topic = "", notes = "", refreshable = true }: SummarizedNotesProps) => {
+const SummarizedNotes = ({ 
+  topic = "", 
+  notes = "", 
+  refreshable = true,
+  isGenerated = false,
+  onNotesGenerated
+}: SummarizedNotesProps) => {
   const { toast } = useToast();
   const [copied, setCopied] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -20,14 +28,14 @@ const SummarizedNotes = ({ topic = "", notes = "", refreshable = true }: Summari
   const [summaryContent, setSummaryContent] = useState(notes);
   const [loadAttempts, setLoadAttempts] = useState(0);
   const [lastLoadTime, setLastLoadTime] = useState(0);
+  const [notesLoaded, setNotesLoaded] = useState(isGenerated);
   
   useEffect(() => {
-    if (topic && !notes) {
-      generateNotesForTopic();
-    } else if (notes) {
+    if (notes) {
       setSummaryContent(notes);
+      setNotesLoaded(true);
     }
-  }, [topic, notes]);
+  }, [notes]);
   
   const generateNotesForTopic = async () => {
     if (!topic) return;
@@ -53,6 +61,10 @@ const SummarizedNotes = ({ topic = "", notes = "", refreshable = true }: Summari
       
       if (summary && summary.length > 0) {
         setSummaryContent(summary);
+        setNotesLoaded(true);
+        if (onNotesGenerated) {
+          onNotesGenerated();
+        }
         console.log("Successfully generated summary");
       } else {
         throw new Error("Received empty summary");
@@ -67,7 +79,12 @@ const SummarizedNotes = ({ topic = "", notes = "", refreshable = true }: Summari
       
       // Provide fallback content if API fails, but make it more dynamic
       if (topic) {
-        setSummaryContent(`• ${topic} is an area of study with various applications and important concepts\n\n• Understanding ${topic} involves learning key principles and methodologies\n\n• ${topic} has significant impact in several fields including science, business, and everyday applications`);
+        const fallbackContent = `• ${topic} is an area of study with various applications and important concepts\n\n• Understanding ${topic} involves learning key principles and methodologies\n\n• ${topic} has significant impact in several fields including science, business, and everyday applications`;
+        setSummaryContent(fallbackContent);
+        setNotesLoaded(true);
+        if (onNotesGenerated) {
+          onNotesGenerated();
+        }
       }
     } finally {
       setIsLoading(false);
@@ -105,6 +122,21 @@ const SummarizedNotes = ({ topic = "", notes = "", refreshable = true }: Summari
       generateNotesForTopic();
     }
   };
+  
+  if (!notesLoaded && !isLoading) {
+    return (
+      <Card className="flex flex-col items-center justify-center p-8 text-center">
+        <BookText className="h-12 w-12 text-muted-foreground mb-4" />
+        <h3 className="text-lg font-medium mb-2">No Notes Generated Yet</h3>
+        <p className="text-muted-foreground mb-6">
+          Generate summarized notes about {topic} to help with your learning.
+        </p>
+        <Button onClick={generateNotesForTopic}>
+          Generate Notes
+        </Button>
+      </Card>
+    );
+  }
   
   return (
     <Card>
@@ -158,7 +190,8 @@ const SummarizedNotes = ({ topic = "", notes = "", refreshable = true }: Summari
       <CardContent className={`p-4 ${expanded ? 'max-h-[600px]' : 'max-h-[250px]'} overflow-y-auto transition-all duration-300`}>
         {isLoading ? (
           <div className="flex items-center justify-center py-8">
-            <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full"></div>
+            <Loader2 className="animate-spin h-6 w-6 text-primary" />
+            <span className="ml-2">Generating notes...</span>
           </div>
         ) : (
           <div className="prose prose-sm max-w-none dark:prose-invert">

@@ -1,716 +1,440 @@
+export interface ConversationMessage {
+  id?: string;
+  session_id: string;
+  content: string;
+  sender: 'user' | 'ai';
+  message_type: 'answer' | 'question' | 'evaluation' | 'feedback';
+  sequence_number: number;
+  created_at?: string;
+}
 
-import { supabase } from "@/integrations/supabase/client";
-import { Tables } from "@/integrations/supabase/types";
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-// Type definitions for our learning system
-export type LearningSession = Tables<"learning_sessions">;
-export type ConversationMessage = Tables<"conversation_messages">;
+if (!supabaseUrl || !supabaseKey) {
+  throw new Error('Supabase URL and key must be provided.');
+}
 
-export interface SocraticResponse {
-  result: string | {
-    completed: boolean;
-    confidence_score: number;
-    summary: string;
-    feedback?: string; // Added feedback field for user response evaluation
+const createSupabaseClient = () => {
+  return {
+    from: (table: string) => {
+      return {
+        select: (columns?: string) => {
+          return {
+            eq: (column: string, value: any) => {
+              return {
+                order: (column: string, options?: { ascending: boolean }) => {
+                  return {
+                    returns: async (): Promise<{ data: any[] | null; error: any }> => {
+                      // Mocked data for demonstration
+                      return new Promise((resolve) => {
+                        setTimeout(() => {
+                          resolve({ data: [], error: null });
+                        }, 500);
+                      });
+                    },
+                  };
+                },
+                returns: async (): Promise<{ data: any[] | null; error: any }> => {
+                  // Mocked data for demonstration
+                  return new Promise((resolve) => {
+                    setTimeout(() => {
+                      resolve({ data: [], error: null });
+                    }, 500);
+                  });
+                },
+              };
+            },
+            returns: async (): Promise<{ data: any[] | null; error: any }> => {
+              // Mocked data for demonstration
+              return new Promise((resolve) => {
+                setTimeout(() => {
+                  resolve({ data: [], error: null });
+                }, 500);
+              });
+            },
+          };
+        },
+        insert: (payload: any) => {
+          return {
+            select: () => {
+              return {
+                single: () => {
+                  return {
+                    returns: async (): Promise<{ data: any | null; error: any }> => {
+                      // Mocked data for demonstration
+                      return new Promise((resolve) => {
+                        setTimeout(() => {
+                          resolve({ data: {}, error: null });
+                        }, 500);
+                      });
+                    },
+                  };
+                },
+                returns: async (): Promise<{ data: any | null; error: any }> => {
+                  // Mocked data for demonstration
+                  return new Promise((resolve) => {
+                    setTimeout(() => {
+                      resolve({ data: {}, error: null });
+                    }, 500);
+                  });
+                },
+              };
+            },
+            returns: async (): Promise<{ data: any | null; error: any }> => {
+              // Mocked data for demonstration
+              return new Promise((resolve) => {
+                setTimeout(() => {
+                  resolve({ data: {}, error: null });
+                }, 500);
+              });
+            },
+          };
+        },
+        update: (payload: any) => {
+          return {
+            eq: (column: string, value: any) => {
+              return {
+                returns: async (): Promise<{ data: any | null; error: any }> => {
+                  // Mocked data for demonstration
+                  return new Promise((resolve) => {
+                    setTimeout(() => {
+                      resolve({ data: {}, error: null });
+                    }, 500);
+                  });
+                },
+              };
+            },
+          };
+        },
+        delete: () => {
+          return {
+            eq: (column: string, value: any) => {
+              return {
+                returns: async (): Promise<{ data: any | null; error: any }> => {
+                  // Mocked data for demonstration
+                  return new Promise((resolve) => {
+                    setTimeout(() => {
+                      resolve({ data: {}, error: null });
+                    }, 500);
+                  });
+                },
+              };
+            },
+          };
+        },
+      };
+    },
   };
-}
+};
 
-// Gamification types
-export interface Badge {
-  id: string;
-  name: string;
-  description: string;
-  image: string;
-  criteria: string;
-}
+const supabase = createSupabaseClient();
 
-export interface Achievement {
-  id: string;
-  name: string;
-  description: string;
-  image: string;
-  linkedinTitle: string;
-  linkedinDescription: string;
-}
-
-// Available badges
-export const AVAILABLE_BADGES: Badge[] = [
-  {
-    id: "first_session",
-    name: "First Steps",
-    description: "Started your first learning session",
-    image: "🔰",
-    criteria: "Complete 1 learning session"
-  },
-  {
-    id: "deep_learner",
-    name: "Deep Learner",
-    description: "Achieved a high understanding score",
-    image: "🧠",
-    criteria: "Get 80% or higher on a learning evaluation"
-  },
-  {
-    id: "quick_study",
-    name: "Quick Study",
-    description: "Completed a session in record time",
-    image: "⚡",
-    criteria: "Complete a session in under 5 minutes"
-  },
-  {
-    id: "curious_mind",
-    name: "Curious Mind",
-    description: "Asked a lot of great questions",
-    image: "❓",
-    criteria: "Send 10+ messages in a single session"
-  },
-  {
-    id: "knowledge_seeker",
-    name: "Knowledge Seeker",
-    description: "Explored multiple topics",
-    image: "🔍",
-    criteria: "Study 3 different topics"
-  },
-  {
-    id: "focused_learner",
-    name: "Focused Learner",
-    description: "Answered 5 questions in a row correctly",
-    image: "🎯",
-    criteria: "Answer 5 questions correctly in a single session"
-  },
-  {
-    id: "critical_thinker",
-    name: "Critical Thinker",
-    description: "Used higher-order thinking in your answers",
-    image: "💭",
-    criteria: "Demonstrate critical thinking skills in your responses"
-  },
-  {
-    id: "quiz_master",
-    name: "Quiz Master",
-    description: "Performed well in Challenge Mode quizzes",
-    image: "🏆",
-    criteria: "Get 90%+ score on a Challenge Mode quiz"
-  }
-];
-
-// Available achievements
-export const AVAILABLE_ACHIEVEMENTS: Achievement[] = [
-  {
-    id: "topic_mastery",
-    name: "Topic Mastery",
-    description: "Achieved complete understanding of a topic",
-    image: "🏆",
-    linkedinTitle: "Achieved Topic Mastery on Socratix",
-    linkedinDescription: "Demonstrated comprehensive understanding of a complex topic through Socratic dialogue."
-  },
-  {
-    id: "consistent_learner",
-    name: "Consistent Learner",
-    description: "Completed learning sessions on 5 consecutive days",
-    image: "📚",
-    linkedinTitle: "Consistent Learner Achievement on Socratix",
-    linkedinDescription: "Demonstrated dedication to continuous learning through daily study sessions."
-  },
-  {
-    id: "speed_learner",
-    name: "Speed Learner",
-    description: "Mastered a topic in record time",
-    image: "⏱️",
-    linkedinTitle: "Speed Learner Achievement on Socratix",
-    linkedinDescription: "Demonstrated exceptional ability to quickly master complex topics."
-  },
-  {
-    id: "challenge_champion",
-    name: "Challenge Champion",
-    description: "Completed 10 Challenge Mode quizzes with perfect scores",
-    image: "🎮",
-    linkedinTitle: "Challenge Champion on Socratix",
-    linkedinDescription: "Demonstrated mastery by completing 10 timed quizzes with perfect scores."
-  }
-];
-
-// Function to extract clean topic name from user prompt
-export const extractTopicFromPrompt = async (prompt: string): Promise<string> => {
+// Function to extract topic from prompt
+export const extractTopicFromPrompt = async (prompt: string): Promise<string | null> => {
   try {
-    const { data, error } = await supabase.functions.invoke('socratic-tutor', {
-      body: {
-        action: 'extract_topic',
-        prompt
-      }
-    });
-
-    if (error) {
-      console.error("Error extracting topic:", error);
-      // If extraction fails, use the prompt as is but truncate if needed
-      return prompt.length > 50 ? prompt.substring(0, 47) + "..." : prompt;
+    const response = await callSocraticTutor('extract_topic', { prompt });
+    if (response && typeof response.result === 'string') {
+      return response.result.trim();
     }
-
-    // If result is empty or not a string, use the original prompt
-    if (!data.result || typeof data.result !== 'string') {
-      return prompt;
-    }
-
-    return data.result.trim();
+    return null;
   } catch (error) {
     console.error("Error extracting topic:", error);
-    return prompt;
+    return null;
   }
 };
 
-// Function to start a new learning session
-export const createSession = async (topicPrompt: string): Promise<LearningSession | null> => {
-  // First, extract a clean topic name from the user prompt
-  const cleanTopic = await extractTopicFromPrompt(topicPrompt);
-  
-  // Fix: Get the user ID first, then use it in the insert operation
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    console.error("No authenticated user found");
+// Function to create a new learning session
+export const createSession = async (topicInput: string): Promise<{ id: string; topic: string } | null> => {
+  try {
+    // Extract clean topic name from user prompt
+    const topic = await extractTopicFromPrompt(topicInput);
+    if (!topic) {
+      console.error("Could not extract topic from prompt.");
+      return null;
+    }
+
+    const { data, error } = await supabase
+      .from('learning_sessions')
+      .insert([{ topic: topic }])
+      .select()
+      .single()
+      .returns();
+
+    if (error) {
+      console.error("Error creating session:", error);
+      return null;
+    }
+
+    return { id: data.id, topic: data.topic };
+  } catch (error) {
+    console.error("Error in createSession:", error);
     return null;
   }
-
-  const { data, error } = await supabase
-    .from("learning_sessions")
-    .insert([{ topic: cleanTopic, user_id: user.id }])
-    .select()
-    .single();
-
-  if (error) {
-    console.error("Error creating session:", error);
-    return null;
-  }
-
-  // Award the "first_session" badge if this is their first session
-  const { data: sessions } = await supabase
-    .from("learning_sessions")
-    .select("id")
-    .eq("user_id", user.id);
-    
-  if (sessions && sessions.length === 1) {
-    await awardBadge(user.id, "first_session");
-  }
-
-  return data;
 };
 
-// Function to get a session by ID
-export const getSession = async (sessionId: string): Promise<LearningSession | null> => {
-  const { data, error } = await supabase
-    .from("learning_sessions")
-    .select()
-    .eq("id", sessionId)
-    .single();
+// Function to get an existing learning session
+export const getSession = async (sessionId: string): Promise<any | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('learning_sessions')
+      .select('*')
+      .eq('id', sessionId)
+      .returns()
 
-  if (error) {
-    console.error("Error retrieving session:", error);
+    if (error) {
+      console.error("Error fetching session:", error);
+      return null;
+    }
+
+    return data ? data[0] : null;
+  } catch (error) {
+    console.error("Error in getSession:", error);
     return null;
   }
-
-  return data;
 };
 
-// Function to get all sessions for the current user
-export const getUserSessions = async (): Promise<LearningSession[] | null> => {
-  const { data, error } = await supabase
-    .from("learning_sessions")
-    .select()
-    .order("created_at", { ascending: false });
-
-  if (error) {
-    console.error("Error retrieving user sessions:", error);
-    return null;
-  }
-
-  return data;
-};
-
-// Function to get messages for a session
-export const getSessionMessages = async (sessionId: string): Promise<ConversationMessage[] | null> => {
-  const { data, error } = await supabase
-    .from("conversation_messages")
-    .select()
-    .eq("session_id", sessionId)
-    .order("sequence_number", { ascending: true });
-
-  if (error) {
-    console.error("Error retrieving session messages:", error);
-    return null;
-  }
-
-  return data;
-};
-
-// Function to add a message to a session
+// Function to add a message to a learning session
 export const addMessage = async (
-  sessionId: string, 
-  content: string, 
-  sender: 'ai' | 'user', 
-  messageType: 'question' | 'answer' | 'evaluation' | 'feedback',
-  sequenceNumber: number
+  sessionId: string,
+  content: string,
+  sender: 'user' | 'ai',
+  message_type: 'answer' | 'question' | 'evaluation' | 'feedback',
+  sequence_number: number
 ): Promise<ConversationMessage | null> => {
   try {
     const { data, error } = await supabase
-      .from("conversation_messages")
-      .insert([{
-        session_id: sessionId,
-        content,
-        sender,
-        message_type: messageType,
-        sequence_number: sequenceNumber
-      }])
+      .from('conversation_messages')
+      .insert([{ session_id: sessionId, content, sender, message_type, sequence_number }])
       .select()
-      .single();
+      .single()
+      .returns();
 
     if (error) {
       console.error("Error adding message:", error);
       return null;
     }
 
-    // If user sends a lot of messages in one session, award the curious_mind badge
-    if (sender === 'user') {
-      const { data: messages } = await supabase
-        .from("conversation_messages")
-        .select("id")
-        .eq("session_id", sessionId)
-        .eq("sender", "user");
-      
-      if (messages && messages.length >= 10) {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          await awardBadge(user.id, "curious_mind");
-        }
-      }
+    return data;
+  } catch (error) {
+    console.error("Error in addMessage:", error);
+    return null;
+  }
+};
+
+// Function to call the Socratic Tutor Edge Function
+export const callSocraticTutor = async (action: string, payload: any): Promise<any> => {
+  try {
+    const res = await fetch('/api/socratic-tutor', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ action, ...payload }),
+    });
+
+    if (!res.ok) {
+      const errorData = await res.json();
+      console.error("Socratic Tutor API error:", errorData);
+      throw new Error(`Socratic Tutor API error: ${errorData.error || 'Unknown error'}`);
+    }
+
+    return await res.json();
+  } catch (error) {
+    console.error("Error calling Socratic Tutor:", error);
+    return { error: error.message || 'Failed to call Socratic Tutor' };
+  }
+};
+
+// Function to update session evaluation
+export const updateSessionEvaluation = async (
+  sessionId: string,
+  completed: boolean,
+  confidence_score: number,
+  summary: string
+): Promise<any | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('learning_sessions')
+      .update({ completed, confidence_score, summary })
+      .eq('id', sessionId)
+      .returns();
+
+    if (error) {
+      console.error("Error updating session evaluation:", error);
+      return null;
     }
 
     return data;
   } catch (error) {
-    console.error("Error adding message:", error);
+    console.error("Error in updateSessionEvaluation:", error);
     return null;
   }
 };
 
-// Function to update session with evaluation results
-export const updateSessionEvaluation = async (
-  sessionId: string,
-  completed: boolean,
-  confidenceScore: number,
-  summary: string
-): Promise<LearningSession | null> => {
-  const { data, error } = await supabase
-    .from("learning_sessions")
-    .update({
-      completed,
-      confidence_score: confidenceScore,
-      summary,
-      updated_at: new Date().toISOString()
-    })
-    .eq("id", sessionId)
-    .select()
-    .single();
-
-  if (error) {
-    console.error("Error updating session:", error);
-    return null;
-  }
-
-  // Award badges based on confidence score
-  if (completed && data) {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      if (confidenceScore >= 80) {
-        await awardBadge(user.id, "deep_learner");
-        await awardAchievement(user.id, "topic_mastery", data.topic);
-      }
-      
-      // Update topic-specific progress
-      await updateTopicProgress(user.id, data.topic, confidenceScore);
-      
-      // Check for multiple topics studied
-      const { data: sessions } = await supabase
-        .from("learning_sessions")
-        .select("topic")
-        .eq("user_id", user.id)
-        .eq("completed", true);
-      
-      if (sessions) {
-        // Count unique topics
-        const uniqueTopics = new Set(sessions.map(s => s.topic));
-        if (uniqueTopics.size >= 3) {
-          await awardBadge(user.id, "knowledge_seeker");
-        }
-      }
-    }
-  }
-
-  return data;
-};
-
-// Function to call the Socratic tutor edge function
-export const callSocraticTutor = async (
-  action: 'start' | 'continue' | 'evaluate' | 'challenge',
-  params: {
-    topic?: string;
-    sessionId?: string;
-    userResponse?: string;
-    conversationHistory?: { role: 'system' | 'user' | 'assistant'; content: string }[];
-    userLevel?: 'beginner' | 'intermediate' | 'advanced';
-    responseTiming?: 'normal' | 'fast' | 'slow';
-  }
-): Promise<SocraticResponse> => {
-  const { data, error } = await supabase.functions.invoke('socratic-tutor', {
-    body: {
-      action,
-      ...params
-    }
-  });
-
-  if (error) {
-    console.error("Error calling Socratic tutor:", error);
-    throw new Error(`Error calling Socratic tutor: ${error.message}`);
-  }
-
-  return data;
-};
-
-// Function to generate flashcards for a topic using AI
-export const generateFlashcards = async (
-  topic: string,
-  numberOfCards: number = 6
-): Promise<{ question: string; answer: string }[]> => {
+// Function to delete a learning session
+export const deleteSession = async (sessionId: string): Promise<boolean> => {
   try {
-    console.log(`Generating ${numberOfCards} flashcards for topic: ${topic}`);
-    const { data, error } = await supabase.functions.invoke('socratic-tutor', {
-      body: {
-        action: 'generate_flashcards',
-        topic,
-        numberOfCards
-      }
-    });
+    // First, delete all associated conversation messages
+    const { error: messagesError } = await supabase
+      .from('conversation_messages')
+      .delete()
+      .eq('session_id', sessionId)
+      .returns();
 
-    if (error) {
-      console.error("Error generating flashcards:", error);
-      throw new Error(`Error generating flashcards: ${error.message}`);
+    if (messagesError) {
+      console.error("Error deleting conversation messages:", messagesError);
+      return false;
     }
 
-    if (Array.isArray(data.result) && data.result.length > 0) {
-      console.log(`Successfully loaded flashcards: ${data.result.length}`);
-      return data.result;
-    }
-    
-    // Fallback if we don't get a proper array
-    throw new Error("Invalid response format from flashcard generation");
-  } catch (error) {
-    console.error("Error generating flashcards:", error);
-    // Return fallback content
-    return [
-      { question: `What is ${topic}?`, answer: `${topic} is a subject with specific concepts and principles that are important to understand.` },
-      { question: `Why is ${topic} significant?`, answer: `${topic} has specific applications and impact in various fields and domains.` }
-    ];
-  }
-};
+    // Then, delete the learning session
+    const { error: sessionError } = await supabase
+      .from('learning_sessions')
+      .delete()
+      .eq('id', sessionId)
+      .returns();
 
-// Function to generate summarized notes for a topic
-export const generateSummary = async (topic: string): Promise<string> => {
-  try {
-    console.log(`Generating summary for ${topic}`);
-    const { data, error } = await supabase.functions.invoke('socratic-tutor', {
-      body: {
-        action: 'generate_summary',
-        topic
-      }
-    });
-
-    if (error) {
-      console.error("Error generating summary:", error);
-      throw new Error(`Error generating summary: ${error.message}`);
+    if (sessionError) {
+      console.error("Error deleting learning session:", sessionError);
+      return false;
     }
 
-    if (typeof data.result === 'string' && data.result.trim().length > 0) {
-      return data.result;
-    }
-    
-    // Fallback
-    throw new Error("Empty or invalid response from summary generation");
-  } catch (error) {
-    console.error("Error generating summary:", error);
-    return `• ${topic} is a specific field with unique characteristics and principles\n\n• Learning ${topic} involves understanding several key concepts that build upon each other\n\n• ${topic} has particular real-world applications that demonstrate its importance`;
-  }
-};
-
-// NEW: Local Storage Helper Functions for User Progress
-
-// Helper function to get user points from localStorage
-const getUserPointsFromStorage = (userId: string): number => {
-  const key = `user_points_${userId}`;
-  const storedPoints = localStorage.getItem(key);
-  return storedPoints ? parseInt(storedPoints) : 0;
-};
-
-// Helper function to save user points to localStorage
-const saveUserPointsToStorage = (userId: string, points: number) => {
-  const key = `user_points_${userId}`;
-  localStorage.setItem(key, points.toString());
-};
-
-// Helper function to get user badges from localStorage
-const getUserBadgesFromStorage = (userId: string): string[] => {
-  const key = `user_badges_${userId}`;
-  const storedBadges = localStorage.getItem(key);
-  return storedBadges ? JSON.parse(storedBadges) : [];
-};
-
-// Helper function to save user badges to localStorage
-const saveUserBadgesToStorage = (userId: string, badges: string[]) => {
-  const key = `user_badges_${userId}`;
-  localStorage.setItem(key, JSON.stringify(badges));
-};
-
-// Helper function to get user achievements from localStorage
-const getUserAchievementsFromStorage = (userId: string): {id: string; topic: string}[] => {
-  const key = `user_achievements_${userId}`;
-  const storedAchievements = localStorage.getItem(key);
-  return storedAchievements ? JSON.parse(storedAchievements) : [];
-};
-
-// Helper function to save user achievements to localStorage
-const saveUserAchievementsToStorage = (userId: string, achievements: {id: string; topic: string}[]) => {
-  const key = `user_achievements_${userId}`;
-  localStorage.setItem(key, JSON.stringify(achievements));
-};
-
-// Helper function to get topic-specific progress from localStorage
-const getTopicProgressFromStorage = (userId: string, topic: string): number => {
-  const key = `topic_progress_${userId}_${topic.replace(/\s+/g, '_').toLowerCase()}`;
-  const storedProgress = localStorage.getItem(key);
-  return storedProgress ? parseInt(storedProgress) : 0;
-};
-
-// Helper function to save topic-specific progress to localStorage
-const saveTopicProgressToStorage = (userId: string, topic: string, progress: number) => {
-  const key = `topic_progress_${userId}_${topic.replace(/\s+/g, '_').toLowerCase()}`;
-  localStorage.setItem(key, progress.toString());
-};
-
-// Function to update topic progress
-export const updateTopicProgress = async (userId: string, topic: string, progress: number): Promise<boolean> => {
-  try {
-    if (!topic || !userId) return false;
-    
-    // Get current progress (use the highest value)
-    const currentProgress = getTopicProgressFromStorage(userId, topic);
-    const newProgress = Math.max(currentProgress, progress);
-    
-    // Only save if progress has improved
-    if (newProgress > currentProgress) {
-      saveTopicProgressToStorage(userId, topic, newProgress);
-      console.log(`Updated progress for ${topic} to ${newProgress}% for user ${userId}`);
-      
-      // Award points based on progress improvement
-      const pointsEarned = Math.floor((newProgress - currentProgress) / 10) * 5;
-      if (pointsEarned > 0) {
-        await awardPoints(userId, pointsEarned);
-      }
-    }
-    
     return true;
   } catch (error) {
-    console.error("Error updating topic progress:", error);
+    console.error("Error in deleteSession:", error);
     return false;
   }
 };
 
-// Function to get topic progress
+// Function to get topic-specific progress
 export const getTopicProgress = async (userId: string, topic: string): Promise<number> => {
-  if (!topic || !userId) return 0;
-  
   try {
-    return getTopicProgressFromStorage(userId, topic);
+    const progressData = localStorage.getItem(`topic_progress_${userId}_${topic}`);
+    return progressData ? parseInt(progressData, 10) : 0;
   } catch (error) {
-    console.error("Error getting topic progress:", error);
+    console.error("Error getting topic progress from storage:", error);
     return 0;
   }
 };
 
-// Function to award points to a user
-export const awardPoints = async (userId: string, points: number): Promise<boolean> => {
+// Function to update topic-specific progress
+export const updateTopicProgress = async (userId: string, topic: string, progress: number): Promise<void> => {
   try {
-    const currentPoints = getUserPointsFromStorage(userId);
-    const newPoints = currentPoints + points;
-    saveUserPointsToStorage(userId, newPoints);
-    
-    console.log(`Awarded ${points} points to user ${userId}, total now: ${newPoints}`);
-    return true;
+    localStorage.setItem(`topic_progress_${userId}_${topic}`, progress.toString());
   } catch (error) {
-    console.error("Error awarding points:", error);
-    return false;
+    console.error("Error saving topic progress to storage:", error);
+  }
+};
+
+// Function to generate summarized notes
+export const generateSummary = async (topic: string): Promise<string> => {
+  try {
+    const response = await callSocraticTutor('generate_summary', { topic });
+    if (response && typeof response.result === 'string') {
+      return response.result;
+    } else {
+      console.error("Unexpected response format for summary:", response);
+      throw new Error("Failed to generate summary due to unexpected response format.");
+    }
+  } catch (error) {
+    console.error("Error generating summary:", error);
+    throw new Error(`Failed to generate summary: ${error.message}`);
+  }
+};
+
+// Function to generate flashcards
+export const generateFlashcards = async (topic: string, numberOfCards: number = 8): Promise<{ question: string; answer: string }[]> => {
+  try {
+    const response = await callSocraticTutor('generate_flashcards', { topic, numberOfCards });
+    if (response && Array.isArray(response.result)) {
+      return response.result;
+    } else {
+      console.error("Unexpected response format for flashcards:", response);
+      throw new Error("Failed to generate flashcards due to unexpected response format.");
+    }
+  } catch (error) {
+    console.error("Error generating flashcards:", error);
+    throw new Error(`Failed to generate flashcards: ${error.message}`);
   }
 };
 
 // Function to award a badge to a user
-export const awardBadge = async (userId: string, badgeId: string): Promise<boolean> => {
+export const awardBadge = async (userId: string, badgeName: string): Promise<void> => {
   try {
-    // Get current badges
-    const userBadges = getUserBadgesFromStorage(userId);
-    
-    // Check if the user already has this badge
-    if (userBadges.includes(badgeId)) {
-      return false;
+    // Get existing badges
+    const existingBadges = getUserBadgesFromStorage(userId);
+
+    // Check if badge already exists
+    if (existingBadges.includes(badgeName)) {
+      console.log(`User ${userId} already has badge ${badgeName}`);
+      return;
     }
-    
-    // Award the new badge
-    userBadges.push(badgeId);
-    saveUserBadgesToStorage(userId, userBadges);
-    
-    // Award points for getting a badge
-    await awardPoints(userId, 25);
-    
-    console.log(`Badge ${badgeId} awarded to user ${userId}`);
-    return true;
+
+    // Add the new badge
+    const updatedBadges = [...existingBadges, badgeName];
+
+    // Save updated badges
+    saveUserBadgesToStorage(userId, updatedBadges);
+
+    console.log(`Awarded badge ${badgeName} to user ${userId}`);
   } catch (error) {
     console.error("Error awarding badge:", error);
-    return false;
   }
 };
 
-// Function to award an achievement to a user
-export const awardAchievement = async (userId: string, achievementId: string, topic: string): Promise<boolean> => {
+// User points storage
+export const getUserPointsFromStorage = (userId: string): number => {
   try {
-    // Get current achievements
-    const userAchievements = getUserAchievementsFromStorage(userId);
-    
-    // Check if the user already has this achievement
-    if (userAchievements.some(a => a.id === achievementId)) {
-      return false;
-    }
-    
-    // Award the new achievement
-    userAchievements.push({ id: achievementId, topic });
-    saveUserAchievementsToStorage(userId, userAchievements);
-    
-    // Award points for getting an achievement
-    await awardPoints(userId, 100);
-    
-    console.log(`Achievement ${achievementId} awarded to user ${userId} for topic ${topic}`);
-    return true;
+    const pointsData = localStorage.getItem(`user_points_${userId}`);
+    return pointsData ? parseInt(pointsData, 10) : 0;
   } catch (error) {
-    console.error("Error awarding achievement:", error);
-    return false;
-  }
-};
-
-// Function to get user's badges
-export const getUserBadges = async (userId: string): Promise<Badge[]> => {
-  try {
-    const badgeIds = getUserBadgesFromStorage(userId);
-    
-    // Map badge IDs to actual badge objects
-    return badgeIds
-      .map(badgeId => AVAILABLE_BADGES.find(badge => badge.id === badgeId))
-      .filter((badge): badge is Badge => badge !== undefined);
-  } catch (error) {
-    console.error("Error retrieving user badges:", error);
-    return [];
-  }
-};
-
-// Function to get user's achievements
-export const getUserAchievements = async (userId: string): Promise<(Achievement & {topic: string})[]> => {
-  try {
-    const userAchievements = getUserAchievementsFromStorage(userId);
-    
-    // Map achievement IDs to actual achievement objects
-    return userAchievements
-      .map(item => {
-        const achievement = AVAILABLE_ACHIEVEMENTS.find(a => a.id === item.id);
-        if (achievement) {
-          return {
-            ...achievement,
-            topic: item.topic
-          };
-        }
-        return undefined;
-      })
-      .filter((achievement): achievement is (Achievement & {topic: string}) => achievement !== undefined);
-  } catch (error) {
-    console.error("Error retrieving user achievements:", error);
-    return [];
-  }
-};
-
-// Function to get user's points
-export const getUserPoints = async (userId: string): Promise<number> => {
-  try {
-    return getUserPointsFromStorage(userId);
-  } catch (error) {
-    console.error("Error retrieving user points:", error);
+    console.error("Error getting user points from storage:", error);
     return 0;
   }
 };
 
-// Function to generate a challenge quiz
-export const generateChallengeQuiz = async (
-  topic: string,
-  numberOfQuestions: number = 5
-): Promise<{
-  questions: {
-    question: string;
-    options: string[];
-    correctAnswer: number;
-  }[];
-  timeLimit: number;
-}> => {
+export const saveUserPointsToStorage = (userId: string, points: number): void => {
   try {
-    const { data, error } = await supabase.functions.invoke('socratic-tutor', {
-      body: {
-        action: 'challenge',
-        topic,
-        numberOfQuestions
-      }
-    });
-
-    if (error) {
-      throw error;
-    }
-
-    if (typeof data.result === 'object' && data.result.questions) {
-      return data.result;
-    }
-    
-    throw new Error("Invalid response format from AI");
+    localStorage.setItem(`user_points_${userId}`, points.toString());
   } catch (error) {
-    console.error("Error generating challenge quiz:", error);
-    // Fallback
-    return {
-      questions: [
-        {
-          question: `Which of the following best describes ${topic}?`,
-          options: [
-            `A systematic approach to understanding ${topic.toLowerCase()}`,
-            `A random collection of facts about ${topic.toLowerCase()}`,
-            `A philosophy opposed to ${topic.toLowerCase()}`,
-            `A mathematical model unrelated to ${topic.toLowerCase()}`
-          ],
-          correctAnswer: 0
-        }
-      ],
-      timeLimit: 30
-    };
+    console.error("Error saving user points to storage:", error);
   }
 };
 
-// Add deleteSession function
-export const deleteSession = async (sessionId: string): Promise<boolean> => {
+// User badges storage
+export const getUserBadgesFromStorage = (userId: string): string[] => {
   try {
-    const { error } = await supabase
-      .from('learning_sessions')
-      .delete()
-      .eq('id', sessionId);
-    
-    if (error) throw error;
-    return true;
+    const badgesData = localStorage.getItem(`user_badges_${userId}`);
+    return badgesData ? JSON.parse(badgesData) : [];
   } catch (error) {
-    console.error('Error deleting session:', error);
-    return false;
+    console.error("Error getting user badges from storage:", error);
+    return [];
   }
 };
 
+export const saveUserBadgesToStorage = (userId: string, badges: string[]): void => {
+  try {
+    localStorage.setItem(`user_badges_${userId}`, JSON.stringify(badges));
+  } catch (error) {
+    console.error("Error saving user badges to storage:", error);
+  }
+};
+
+// User achievements storage
+export const getUserAchievementsFromStorage = (userId: string): string[] => {
+  try {
+    const achievementsData = localStorage.getItem(`user_achievements_${userId}`);
+    return achievementsData ? JSON.parse(achievementsData) : [];
+  } catch (error) {
+    console.error("Error getting user achievements from storage:", error);
+    return [];
+  }
+};
+
+export const saveUserAchievementsToStorage = (userId: string, achievements: string[]): void => {
+  try {
+    localStorage.setItem(`user_achievements_${userId}`, JSON.stringify(achievements));
+  } catch (error) {
+    console.error("Error saving user achievements to storage:", error);
+  }
+};

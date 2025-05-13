@@ -35,6 +35,8 @@ async function callOpenAIWithRetry(url: string, body: any, maxRetries = 3): Prom
   let lastError;
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
+      console.log(`Making OpenAI API call to ${url}, attempt ${attempt + 1}/${maxRetries}`);
+      
       const response = await fetch(url, {
         method: 'POST',
         headers: {
@@ -44,6 +46,8 @@ async function callOpenAIWithRetry(url: string, body: any, maxRetries = 3): Prom
         body: JSON.stringify(body),
       });
       
+      console.log(`OpenAI API response status: ${response.status}`);
+      
       // If rate limited, wait and retry
       if (response.status === 429) {
         const retryAfter = response.headers.get('Retry-After') || '2';
@@ -51,6 +55,12 @@ async function callOpenAIWithRetry(url: string, body: any, maxRetries = 3): Prom
         console.log(`Rate limited. Retrying after ${waitTime}ms. Attempt ${attempt + 1}/${maxRetries}`);
         await delay(waitTime);
         continue;
+      }
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`OpenAI API error: ${response.status} - ${errorText}`);
+        throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
       }
       
       return response;
@@ -72,7 +82,12 @@ serve(async (req) => {
   }
 
   try {
-    const { action, topic, sessionId, userResponse, conversationHistory, userLevel, responseTiming, prompt, numberOfCards } = await req.json() as SocraticRequest;
+    console.log("Received request to socratic-tutor function");
+    
+    const requestData = await req.json() as SocraticRequest;
+    console.log(`Action: ${requestData.action}`);
+    
+    const { action, topic, sessionId, userResponse, conversationHistory, userLevel, responseTiming, prompt, numberOfCards } = requestData;
     
     let messages: { role: string; content: string }[] = [];
     // Use OpenAI for chat interactions (Socratic dialog)
@@ -130,6 +145,7 @@ serve(async (req) => {
         }
       ];
     } else if (action === 'start') {
+      console.log(`Starting new conversation about topic: "${topic}"`);
       // Starting a new Socratic session
       messages = [
         {
@@ -146,6 +162,7 @@ serve(async (req) => {
         }
       ];
     } else if (action === 'continue') {
+      console.log(`Continuing conversation, user response: "${userResponse?.substring(0, 30)}..."`);
       // Continue an existing conversation
       if (!conversationHistory || !userResponse) {
         throw new Error('Missing conversation history or user response');
@@ -181,6 +198,8 @@ serve(async (req) => {
           QUESTION: [Your next question]"`
         }
       ];
+      
+      console.log(`Conversation history length: ${conversationHistory.length}`);
     } else if (action === 'evaluate') {
       // Evaluate the user's progress
       if (!conversationHistory || !topic) {
@@ -239,6 +258,8 @@ serve(async (req) => {
       throw new Error(`Invalid action specified: ${action}`);
     }
 
+    console.log(`Calling OpenAI with model: ${model} and ${messages.length} messages`);
+    
     // Call OpenAI API with retry logic
     const response = await callOpenAIWithRetry('https://api.openai.com/v1/chat/completions', {
       model,
@@ -254,11 +275,13 @@ serve(async (req) => {
 
     const data = await response.json();
     const result = data.choices[0].message.content;
+    console.log(`OpenAI response received, length: ${result.length}`);
     
     // For evaluation, challenge, or flashcards action, parse the response as JSON
     let parsedResult = result;
     if (action === 'evaluate' || action === 'challenge' || action === 'generate_flashcards') {
       try {
+        console.log(`Parsing ${action} result as JSON`);
         // Extract JSON from the response if it's not already valid JSON
         const jsonMatch = result.match(/\{[\s\S]*\}/);
         const arrayMatch = result.match(/\[[\s\S]*\]/);
@@ -269,8 +292,11 @@ serve(async (req) => {
         } else {
           parsedResult = JSON.parse(result);
         }
+        console.log(`Successfully parsed ${action} result`);
       } catch (e) {
         console.error(`Failed to parse ${action} result as JSON:`, e);
+        console.error(`Raw result: ${result.substring(0, 200)}...`);
+        
         // Provide a fallback structured response
         if (action === 'evaluate') {
           parsedResult = {
@@ -322,6 +348,9 @@ serve(async (req) => {
     } else if (error.message.includes('API key')) {
       errorMessage = "API key configuration issue. Please check server configuration.";
       statusCode = 401;
+    } else if (error.message === 'Max retries reached') {
+      errorMessage = "Server is currently busy. Please try again later.";
+      statusCode = 503;
     }
     
     return new Response(JSON.stringify({ error: errorMessage }), {
