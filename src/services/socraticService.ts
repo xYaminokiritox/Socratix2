@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { Tables } from "@/integrations/supabase/types";
 
@@ -436,6 +437,47 @@ export const generateSummary = async (topic: string): Promise<string> => {
   }
 };
 
+// NEW: Local Storage Helper Functions for User Progress
+
+// Helper function to get user points from localStorage
+const getUserPointsFromStorage = (userId: string): number => {
+  const key = `user_points_${userId}`;
+  const storedPoints = localStorage.getItem(key);
+  return storedPoints ? parseInt(storedPoints) : 0;
+};
+
+// Helper function to save user points to localStorage
+const saveUserPointsToStorage = (userId: string, points: number) => {
+  const key = `user_points_${userId}`;
+  localStorage.setItem(key, points.toString());
+};
+
+// Helper function to get user badges from localStorage
+const getUserBadgesFromStorage = (userId: string): string[] => {
+  const key = `user_badges_${userId}`;
+  const storedBadges = localStorage.getItem(key);
+  return storedBadges ? JSON.parse(storedBadges) : [];
+};
+
+// Helper function to save user badges to localStorage
+const saveUserBadgesToStorage = (userId: string, badges: string[]) => {
+  const key = `user_badges_${userId}`;
+  localStorage.setItem(key, JSON.stringify(badges));
+};
+
+// Helper function to get user achievements from localStorage
+const getUserAchievementsFromStorage = (userId: string): {id: string; topic: string}[] => {
+  const key = `user_achievements_${userId}`;
+  const storedAchievements = localStorage.getItem(key);
+  return storedAchievements ? JSON.parse(storedAchievements) : [];
+};
+
+// Helper function to save user achievements to localStorage
+const saveUserAchievementsToStorage = (userId: string, achievements: {id: string; topic: string}[]) => {
+  const key = `user_achievements_${userId}`;
+  localStorage.setItem(key, JSON.stringify(achievements));
+};
+
 // Helper function to get topic-specific progress from localStorage
 const getTopicProgressFromStorage = (userId: string, topic: string): number => {
   const key = `topic_progress_${userId}_${topic.replace(/\s+/g, '_').toLowerCase()}`;
@@ -671,3 +713,4 @@ export const deleteSession = async (sessionId: string): Promise<boolean> => {
     return false;
   }
 };
+
