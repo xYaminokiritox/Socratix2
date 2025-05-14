@@ -8,7 +8,7 @@ const corsHeaders = {
 };
 
 interface SocraticRequest {
-  action: 'start' | 'continue' | 'evaluate' | 'challenge';
+  action: 'start' | 'continue' | 'evaluate' | 'challenge' | 'extract_topic' | 'generate_flashcards' | 'generate_summary';
   topic?: string;
   sessionId?: string;
   userResponse?: string;
@@ -18,6 +18,61 @@ interface SocraticRequest {
     role: 'system' | 'user' | 'assistant';
     content: string;
   }[];
+  prompt?: string; // Raw user input for topic extraction
+  numberOfCards?: number; // For flashcard generation
+}
+
+// Simple delay function to implement retries
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Retry wrapper for OpenAI calls to handle rate limits
+async function callOpenAIWithRetry(url: string, body: any, maxRetries = 3): Promise<Response> {
+  const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
+  if (!openAIApiKey) {
+    throw new Error('OpenAI API key not found');
+  }
+  
+  let lastError;
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      console.log(`Making OpenAI API call to ${url}, attempt ${attempt + 1}/${maxRetries}`);
+      
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${openAIApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      });
+      
+      console.log(`OpenAI API response status: ${response.status}`);
+      
+      // If rate limited, wait and retry
+      if (response.status === 429) {
+        const retryAfter = response.headers.get('Retry-After') || '2';
+        const waitTime = parseInt(retryAfter) * 1000 || 2000 * Math.pow(2, attempt);
+        console.log(`Rate limited. Retrying after ${waitTime}ms. Attempt ${attempt + 1}/${maxRetries}`);
+        await delay(waitTime);
+        continue;
+      }
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`OpenAI API error: ${response.status} - ${errorText}`);
+        throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
+      }
+      
+      return response;
+    } catch (error) {
+      console.error(`Attempt ${attempt + 1} failed:`, error);
+      lastError = error;
+      // Exponential backoff
+      await delay(1000 * Math.pow(2, attempt));
+    }
+  }
+  
+  throw lastError || new Error('Max retries reached');
 }
 
 serve(async (req) => {
@@ -27,29 +82,71 @@ serve(async (req) => {
   }
 
   try {
-    const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
-    if (!openAIApiKey) {
-      throw new Error('OpenAI API key not found');
-    }
-
-    console.log("Request received");
-    let body: SocraticRequest;
-    try {
-      body = await req.json() as SocraticRequest;
-      console.log("Request body:", JSON.stringify(body));
-    } catch (e) {
-      console.error("Error parsing request body:", e);
-      throw new Error("Invalid request body");
-    }
-
-    const { action, topic, sessionId, userResponse, conversationHistory, userLevel, responseTiming } = body;
+    console.log("Received request to socratic-tutor function");
+    
+    const requestData = await req.json() as SocraticRequest;
+    console.log(`Action: ${requestData.action}`);
+    
+    const { action, topic, sessionId, userResponse, conversationHistory, userLevel, responseTiming, prompt, numberOfCards } = requestData;
     
     let messages: { role: string; content: string }[] = [];
+    // Use OpenAI for chat interactions (Socratic dialog)
+    let model = 'gpt-4o-mini'; // Default model for chat interactions
     
-    if (action === 'start') {
+    if (action === 'extract_topic') {
+      // Extract clean topic name from user prompt
+      messages = [
+        {
+          role: 'system',
+          content: `Extract the main topic the user wants to learn about from this sentence. Return ONLY the topic name, capitalized appropriately, with no explanation or additional text.`
+        },
+        {
+          role: 'user',
+          content: prompt || ""
+        }
+      ];
+    } else if (action === 'generate_flashcards') {
+      // Generate flashcards for the topic
+      messages = [
+        {
+          role: 'system',
+          content: `Create ${numberOfCards || 8} specific and informative flashcards about "${topic}". Focus on key concepts, definitions, and important facts.
+          Each flashcard should have a clear question on the front and a concise, accurate answer on the back.
+          Return your response in this exact JSON format:
+          [
+            {
+              "question": "Question on front of card",
+              "answer": "Concise answer on back of card"
+            },
+            ...
+          ]
+          
+          Make questions focused and specific to the topic "${topic}". Answers should be brief but informative.`
+        },
+        {
+          role: 'user',
+          content: `Generate ${numberOfCards || 8} flashcards specifically about ${topic}. Cover the most important concepts and facts.`
+        }
+      ];
+    } else if (action === 'generate_summary') {
+      // Generate summarized notes
+      messages = [
+        {
+          role: 'system',
+          content: `Create comprehensive but concise summarized notes specifically about "${topic}" for a student. 
+          Structure the notes with bullet points, focusing on key concepts, definitions, and important relationships.
+          Include 6-8 main points that would help someone quickly review and understand ${topic}.
+          Format each point with a bullet (•) and make sure the notes are informative yet concise.
+          Be specific to the topic "${topic}" and include factual information.`
+        },
+        {
+          role: 'user',
+          content: `Create summarized notes about ${topic}. Include the most important facts and concepts.`
+        }
+      ];
+    } else if (action === 'start') {
+      console.log(`Starting new conversation about topic: "${topic}"`);
       // Starting a new Socratic session
-      console.log(`Starting new session about ${topic}`);
-      
       messages = [
         {
           role: 'system',
@@ -65,12 +162,11 @@ serve(async (req) => {
         }
       ];
     } else if (action === 'continue') {
+      console.log(`Continuing conversation, user response: "${userResponse?.substring(0, 30)}..."`);
       // Continue an existing conversation
       if (!conversationHistory || !userResponse) {
         throw new Error('Missing conversation history or user response');
       }
-      
-      console.log(`Continuing conversation with user response: ${userResponse.substring(0, 30)}...`);
       
       // Adapt difficulty based on user responses
       const difficultyAdjustment = userLevel ? 
@@ -102,13 +198,13 @@ serve(async (req) => {
           QUESTION: [Your next question]"`
         }
       ];
+      
+      console.log(`Conversation history length: ${conversationHistory.length}`);
     } else if (action === 'evaluate') {
       // Evaluate the user's progress
       if (!conversationHistory || !topic) {
         throw new Error('Missing conversation history or topic');
       }
-      
-      console.log(`Evaluating conversation about ${topic}`);
       
       messages = [
         {
@@ -129,8 +225,6 @@ serve(async (req) => {
       if (!topic) {
         throw new Error('Missing topic for challenge');
       }
-      
-      console.log(`Creating challenge quiz about ${topic}`);
       
       messages = [
         {
@@ -161,80 +255,106 @@ serve(async (req) => {
         }
       ];
     } else {
-      throw new Error('Invalid action specified');
+      throw new Error(`Invalid action specified: ${action}`);
     }
 
-    console.log(`Sending request to OpenAI with ${messages.length} messages`);
-    console.log("First message:", messages[0].content.substring(0, 50) + "...");
+    console.log(`Calling OpenAI with model: ${model} and ${messages.length} messages`);
+    
+    // Call OpenAI API with retry logic
+    const response = await callOpenAIWithRetry('https://api.openai.com/v1/chat/completions', {
+      model,
+      messages,
+      temperature: 0.7,  // Slightly reduce randomness for more consistent outputs
+    });
 
-    try {
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${openAIApiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'gpt-4o-mini',
-          messages,
-        }),
-      });
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error("OpenAI API error:", errorData);
+      throw new Error(`OpenAI API error: ${errorData.error?.message || 'Unknown error'}`);
+    }
 
-      if (!response.ok) {
-        const errorData = await response.text();
-        console.error("OpenAI API error status:", response.status);
-        console.error("OpenAI API error response:", errorData);
-        throw new Error(`OpenAI API error: ${response.status} ${errorData}`);
-      }
-
-      const data = await response.json();
-      const result = data.choices[0].message.content;
-      
-      console.log("OpenAI response received:", result.substring(0, 50) + "...");
-      
-      // For evaluation or challenge action, parse the response as JSON
-      let parsedResult = result;
-      if (action === 'evaluate' || action === 'challenge') {
-        try {
-          // Extract JSON from the response if it's not already valid JSON
-          const jsonMatch = result.match(/\{[\s\S]*\}/);
-          if (jsonMatch) {
-            parsedResult = JSON.parse(jsonMatch[0]);
-          } else {
-            parsedResult = JSON.parse(result);
-          }
-          console.log("Parsed JSON response");
-        } catch (e) {
-          console.error(`Failed to parse ${action} result as JSON:`, e);
-          // Provide a fallback structured response
-          if (action === 'evaluate') {
-            parsedResult = {
-              completed: false,
-              confidence_score: 0,
-              summary: "Unable to evaluate the conversation.",
-              feedback: "Please continue the conversation to receive a more accurate evaluation."
-            };
-          } else {
-            parsedResult = {
-              questions: [],
-              timeLimit: 0
-            };
-          }
-          console.log("Using fallback response");
+    const data = await response.json();
+    const result = data.choices[0].message.content;
+    console.log(`OpenAI response received, length: ${result.length}`);
+    
+    // For evaluation, challenge, or flashcards action, parse the response as JSON
+    let parsedResult = result;
+    if (action === 'evaluate' || action === 'challenge' || action === 'generate_flashcards') {
+      try {
+        console.log(`Parsing ${action} result as JSON`);
+        // Extract JSON from the response if it's not already valid JSON
+        const jsonMatch = result.match(/\{[\s\S]*\}/);
+        const arrayMatch = result.match(/\[[\s\S]*\]/);
+        if (jsonMatch) {
+          parsedResult = JSON.parse(jsonMatch[0]);
+        } else if (arrayMatch) {
+          parsedResult = JSON.parse(arrayMatch[0]);
+        } else {
+          parsedResult = JSON.parse(result);
+        }
+        console.log(`Successfully parsed ${action} result`);
+      } catch (e) {
+        console.error(`Failed to parse ${action} result as JSON:`, e);
+        console.error(`Raw result: ${result.substring(0, 200)}...`);
+        
+        // Provide a fallback structured response
+        if (action === 'evaluate') {
+          parsedResult = {
+            completed: false,
+            confidence_score: 0,
+            summary: "Unable to evaluate the conversation.",
+            feedback: "Please continue the conversation to receive a more accurate evaluation."
+          };
+        } else if (action === 'challenge') {
+          parsedResult = {
+            questions: [
+              {
+                question: `What is a key concept in ${topic}?`,
+                options: ["Option A", "Option B", "Option C", "Option D"],
+                correctAnswer: 0
+              }
+            ],
+            timeLimit: 60
+          };
+        } else if (action === 'generate_flashcards') {
+          parsedResult = [
+            { 
+              question: `What is ${topic}?`, 
+              answer: `${topic} is an important subject with key concepts and principles.` 
+            },
+            { 
+              question: `Why is ${topic} important?`, 
+              answer: `${topic} has significant applications in many fields.` 
+            }
+          ];
         }
       }
-
-      return new Response(JSON.stringify({ result: parsedResult }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    } catch (error) {
-      console.error("Error calling OpenAI:", error);
-      throw error;
     }
+
+    return new Response(JSON.stringify({ result: parsedResult }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   } catch (error) {
     console.error('Error in socratic-tutor function:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
+    
+    // Create a more helpful error response based on the type of error
+    let errorMessage = error.message;
+    let statusCode = 500;
+    
+    // Handle specific error cases
+    if (error.message.includes('rate limit')) {
+      errorMessage = "OpenAI rate limit reached. Please try again in a few moments.";
+      statusCode = 429;
+    } else if (error.message.includes('API key')) {
+      errorMessage = "API key configuration issue. Please check server configuration.";
+      statusCode = 401;
+    } else if (error.message === 'Max retries reached') {
+      errorMessage = "Server is currently busy. Please try again later.";
+      statusCode = 503;
+    }
+    
+    return new Response(JSON.stringify({ error: errorMessage }), {
+      status: statusCode,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
