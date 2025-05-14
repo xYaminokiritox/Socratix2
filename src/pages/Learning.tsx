@@ -4,7 +4,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, Brain, BookOpen, ArrowUp, Timer, MessageSquare, BookText, FlashIcon } from "lucide-react";
+import { Loader2, Brain, BookOpen, ArrowUp, Timer, MessageSquare, BookText, Zap } from "lucide-react";
 import Header from "@/components/Header";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
