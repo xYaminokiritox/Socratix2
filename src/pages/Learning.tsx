@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -46,6 +47,7 @@ const Learning = () => {
   
   // Track which resources have been loaded
   const [notesGenerated, setNotesGenerated] = useState(false);
+  const [startAttempted, setStartAttempted] = useState(false);
 
   // Load existing session if sessionId is provided
   useEffect(() => {
@@ -108,12 +110,14 @@ const Learning = () => {
     }
 
     setIsLoading(true);
+    setStartAttempted(true);
     try {
       // Create a new session in the database with cleaned topic
       console.log("Starting new session with topic:", topicInput);
       const newSession = await createSession(topicInput);
-      if (!newSession) {
-        console.error("Failed to create learning session");
+      
+      if (!newSession || !newSession.id) {
+        console.error("Failed to create learning session", newSession);
         toast.error("Failed to create learning session. Please try again.");
         return;
       }
@@ -132,6 +136,8 @@ const Learning = () => {
       
       // Always set active tab to chat when starting a new session
       setActiveTab("chat");
+      
+      toast.success(`Started learning session: ${newSession.topic}`);
     } catch (error) {
       console.error("Error starting session:", error);
       toast.error("Failed to create learning session. Please check your connection and try again.");

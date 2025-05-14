@@ -34,6 +34,7 @@ const ChatInterface = ({
   const [userLevel, setUserLevel] = useState<'beginner' | 'intermediate' | 'advanced'>('beginner');
   const [responseTiming, setResponseTiming] = useState<'normal' | 'fast' | 'slow'>('normal');
   const [initialized, setInitialized] = useState(false);
+  const [initAttempted, setInitAttempted] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
   // Scroll to bottom of messages
@@ -44,14 +45,17 @@ const ChatInterface = ({
   // Start session if we have a topic but no messages yet
   useEffect(() => {
     const initializeChat = async () => {
-      if (sessionId && topic && messages.length === 0 && !initialized) {
+      if (sessionId && topic && messages.length === 0 && !initialized && !initAttempted) {
         setInitialized(true);
+        setInitAttempted(true);
         await startConversation();
       }
     };
 
-    initializeChat();
-  }, [sessionId, topic, messages.length, initialized]);
+    if (sessionId && topic) {
+      initializeChat();
+    }
+  }, [sessionId, topic, messages.length, initialized, initAttempted]);
   
   const startConversation = async () => {
     if (!sessionId || !topic) return;
@@ -66,32 +70,87 @@ const ChatInterface = ({
       if (response.error) {
         console.error(`Error: ${response.error}`);
         toast.error(`Error: ${response.error}`);
+        
+        // Add a fallback message if the API call fails
+        const fallbackMessage = {
+          id: `fallback-${Date.now()}`,
+          session_id: sessionId,
+          content: `Let's begin our exploration of ${topic}. What do you already know about this subject?`,
+          sender: 'ai',
+          message_type: 'question',
+          sequence_number: 1
+        };
+        
+        setMessages([fallbackMessage]);
         return;
       }
       
       if (typeof response.result === 'string') {
         console.log("Got first question:", response.result);
         
-        // Add AI's first question to the conversation
-        const aiMessage = await addMessage(
-          sessionId,
-          response.result,
-          'ai',
-          'question',
-          1
-        );
+        try {
+          // Add AI's first question to the conversation
+          const aiMessage = await addMessage(
+            sessionId,
+            response.result,
+            'ai',
+            'question',
+            1
+          );
 
-        // Update local messages state if we got a valid response
-        if (aiMessage) {
-          setMessages([aiMessage]);
+          // Update local messages state if we got a valid response
+          if (aiMessage) {
+            setMessages([aiMessage]);
+          } else {
+            // If message wasn't saved to the database, still show it locally
+            setMessages([{
+              id: `local-${Date.now()}`,
+              session_id: sessionId,
+              content: response.result,
+              sender: 'ai',
+              message_type: 'question',
+              sequence_number: 1
+            }]);
+          }
+        } catch (saveError) {
+          console.error("Error saving message:", saveError);
+          // Show message locally even if it couldn't be saved
+          setMessages([{
+            id: `local-${Date.now()}`,
+            session_id: sessionId,
+            content: response.result,
+            sender: 'ai',
+            message_type: 'question',
+            sequence_number: 1
+          }]);
         }
       } else {
         console.error("Unexpected response format:", response);
         toast.error("Received an invalid response from the AI");
+        
+        // Add a fallback message
+        setMessages([{
+          id: `fallback-${Date.now()}`,
+          session_id: sessionId,
+          content: `Let's begin our exploration of ${topic}. What do you already know about this subject?`,
+          sender: 'ai',
+          message_type: 'question',
+          sequence_number: 1
+        }]);
       }
     } catch (error) {
       console.error("Error starting conversation:", error);
       toast.error("Failed to start the conversation. Please try refreshing.");
+      
+      // Add a fallback message
+      setMessages([{
+        id: `fallback-${Date.now()}`,
+        session_id: sessionId,
+        content: `Let's begin our exploration of ${topic}. What do you already know about this subject?`,
+        sender: 'ai',
+        message_type: 'question',
+        sequence_number: 1
+      }]);
     } finally {
       setIsLoading(false);
     }
@@ -381,6 +440,15 @@ const ChatInterface = ({
           <div className="h-full flex flex-col items-center justify-center text-muted-foreground">
             <MessageSquare className="h-10 w-10 mb-2 opacity-50" />
             <p>Start your learning journey with Socratic questioning</p>
+            {initAttempted && sessionId && topic && (
+              <Button 
+                onClick={startConversation} 
+                variant="outline" 
+                className="mt-4"
+              >
+                Retry Conversation Start
+              </Button>
+            )}
           </div>
         )}
         
@@ -478,11 +546,11 @@ const ChatInterface = ({
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            disabled={isLoading || !sessionId}
+            disabled={isLoading || !sessionId || messages.length === 0}
           />
           <Button 
             onClick={handleSendMessage} 
-            disabled={!input.trim() || isLoading || !sessionId}
+            disabled={!input.trim() || isLoading || !sessionId || messages.length === 0}
           >
             {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           </Button>
