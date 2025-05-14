@@ -1,4 +1,3 @@
-
 export interface ConversationMessage {
   id?: string;
   session_id: string;
@@ -77,11 +76,12 @@ const MOCK_SESSIONS = [
   },
 ];
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+// For Vite, we use import.meta.env instead of process.env
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseKey) {
-  throw new Error('Supabase URL and key must be provided.');
+  console.warn('Supabase URL and key not provided. Using mock data only.');
 }
 
 const createSupabaseClient = () => {
