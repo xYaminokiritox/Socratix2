@@ -4,10 +4,11 @@ import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, Brain, BookOpen, ArrowUp, Timer } from "lucide-react";
+import { Loader2, Brain, BookOpen, ArrowUp, Timer, MessageSquare, BookText, FlashIcon } from "lucide-react";
 import Header from "@/components/Header";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ChatInterface from "@/components/ChatInterface";
 import Flashcard from "@/components/Flashcard";
 import SummarizedNotes from "@/components/SummarizedNotes";
@@ -42,6 +43,7 @@ const Learning = () => {
   } | null>(null);
   const [showChallengeMode, setShowChallengeMode] = useState(false);
   const [learningProgress, setLearningProgress] = useState(0);
+  const [activeTab, setActiveTab] = useState("chat");
 
   // Load existing session if sessionId is provided
   useEffect(() => {
@@ -171,8 +173,6 @@ const Learning = () => {
   };
   
   const handleChallengeComplete = async (score: number) => {
-    setShowChallengeMode(false);
-    
     // Update progress if the score is higher
     if (score > learningProgress && session?.user && topic) {
       setLearningProgress(score);
@@ -185,6 +185,9 @@ const Learning = () => {
     if (score >= 90 && session?.user) {
       await awardBadge(session.user.id, "quiz_master");
     }
+    
+    // Return to the chat tab after quiz is complete
+    setActiveTab("chat");
   };
   
   const handleDeleteSession = async () => {
@@ -277,7 +280,7 @@ const Learning = () => {
                     style={{ width: `${learningProgress}%` }}
                   ></div>
                 </div>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-muted-foreground pt-2">
                   {evaluation?.completed 
                     ? "Session completed! Check your achievements below." 
                     : "Keep learning to improve your understanding and earn badges!"}
@@ -287,43 +290,86 @@ const Learning = () => {
             
             <div className="grid md:grid-cols-3 gap-6">
               <div className="md:col-span-2">
-                {showChallengeMode ? (
-                  <ChallengeQuiz 
-                    topic={topic} 
-                    onComplete={handleChallengeComplete} 
-                  />
-                ) : (
-                  <ChatInterface 
-                    sessionId={activeSession}
-                    topic={topic}
-                    onEvaluationComplete={handleEvaluationComplete}
-                  />
-                )}
-                
-                {/* Challenge Mode Button */}
-                {evaluation?.completed && !showChallengeMode && (
-                  <div className="mt-4 flex justify-center">
-                    <Button 
-                      onClick={() => setShowChallengeMode(true)}
-                      variant="outline"
-                      className="group relative overflow-hidden"
-                    >
-                      <div className="absolute inset-0 bg-gradient-to-r from-yellow-500/30 to-amber-500/30 opacity-50 group-hover:opacity-70 transition-opacity"></div>
-                      <span className="relative flex items-center">
-                        <Timer className="mr-2 h-4 w-4" />
-                        Challenge Me!
-                      </span>
-                    </Button>
-                  </div>
-                )}
+                <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                  <TabsList className="grid grid-cols-4 mb-4">
+                    <TabsTrigger value="chat" className="flex items-center gap-1">
+                      <MessageSquare className="h-4 w-4" />
+                      <span className="hidden sm:inline">Chat</span>
+                    </TabsTrigger>
+                    <TabsTrigger value="notes" className="flex items-center gap-1">
+                      <BookText className="h-4 w-4" />
+                      <span className="hidden sm:inline">Notes</span>
+                    </TabsTrigger>
+                    <TabsTrigger value="flashcards" className="flex items-center gap-1">
+                      <BookOpen className="h-4 w-4" />
+                      <span className="hidden sm:inline">Flashcards</span>
+                    </TabsTrigger>
+                    <TabsTrigger value="quiz" className="flex items-center gap-1">
+                      <Timer className="h-4 w-4" />
+                      <span className="hidden sm:inline">Quiz Me</span>
+                    </TabsTrigger>
+                  </TabsList>
+                  
+                  <TabsContent value="chat">
+                    <ChatInterface 
+                      sessionId={activeSession}
+                      topic={topic}
+                      onEvaluationComplete={handleEvaluationComplete}
+                    />
+                  </TabsContent>
+                  
+                  <TabsContent value="notes">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Learning Notes</CardTitle>
+                        <CardDescription>Summarized information about {topic}</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <SummarizedNotes topic={topic} notes={summarizedNotes} />
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+                  
+                  <TabsContent value="flashcards">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Flashcards</CardTitle>
+                        <CardDescription>Test your knowledge on {topic}</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <Flashcard topic={topic} />
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+                  
+                  <TabsContent value="quiz">
+                    {evaluation?.completed ? (
+                      <ChallengeQuiz 
+                        topic={topic} 
+                        onComplete={handleChallengeComplete} 
+                      />
+                    ) : (
+                      <Card>
+                        <CardContent className="pt-6 py-10 text-center">
+                          <div className="mx-auto w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-4">
+                            <Timer className="h-6 w-6 text-muted-foreground" />
+                          </div>
+                          <h3 className="text-lg font-medium mb-2">Quiz not available yet</h3>
+                          <p className="text-muted-foreground mb-4">
+                            Complete your learning session in the Chat tab first to unlock the quiz challenge.
+                          </p>
+                          <Button onClick={() => setActiveTab("chat")} variant="outline">
+                            Go to Chat
+                          </Button>
+                        </CardContent>
+                      </Card>
+                    )}
+                  </TabsContent>
+                </Tabs>
               </div>
               
               <div className="space-y-6">
                 <UserProgress />
-                
-                <Flashcard topic={topic} />
-                
-                <SummarizedNotes topic={topic} notes={summarizedNotes} />
                 
                 {evaluation && (
                   <Button 
