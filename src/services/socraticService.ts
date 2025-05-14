@@ -305,10 +305,12 @@ export const addMessage = async (
 // Function to call the Socratic Tutor Edge Function
 export const callSocraticTutor = async (action: string, payload: any): Promise<any> => {
   try {
-    const res = await fetch('/api/socratic-tutor', {
+    // Use the proper URL for the Supabase Edge Function
+    const res = await fetch(`https://bhirorpogkfnafuxfkox.supabase.co/functions/v1/socratic-tutor`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${supabaseKey}`
       },
       body: JSON.stringify({ action, ...payload }),
     });
