@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -65,6 +64,7 @@ const ChatInterface = ({
       const response = await callSocraticTutor('start', { topic });
       
       if (response.error) {
+        console.error(`Error: ${response.error}`);
         toast.error(`Error: ${response.error}`);
         return;
       }

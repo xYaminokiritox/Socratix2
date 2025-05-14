@@ -206,10 +206,13 @@ export const extractTopicFromPrompt = async (prompt: string): Promise<string | n
     if (response && typeof response.result === 'string') {
       return response.result.trim();
     }
-    return null;
+    // If we don't get a valid response, just use the prompt as the topic
+    console.log("Could not extract topic, using prompt as topic");
+    return prompt.trim();
   } catch (error) {
     console.error("Error extracting topic:", error);
-    return null;
+    // Fallback to using the raw prompt if extraction fails
+    return prompt.trim();
   }
 };
 
@@ -223,6 +226,8 @@ export const createSession = async (topicInput: string): Promise<{ id: string; t
       return null;
     }
 
+    console.log("Creating session with topic:", topic);
+
     const { data, error } = await supabase
       .from('learning_sessions')
       .insert([{ topic: topic }])
@@ -235,6 +240,7 @@ export const createSession = async (topicInput: string): Promise<{ id: string; t
       return null;
     }
 
+    console.log("Session created successfully:", data);
     return { id: data.id, topic: data.topic };
   } catch (error) {
     console.error("Error in createSession:", error);
@@ -306,11 +312,13 @@ export const addMessage = async (
 export const callSocraticTutor = async (action: string, payload: any): Promise<any> => {
   try {
     // Use the proper URL for the Supabase Edge Function
+    console.log(`Calling Socratic Tutor with action: ${action}`, payload);
+    
+    // Make sure to use the full URL
     const res = await fetch(`https://bhirorpogkfnafuxfkox.supabase.co/functions/v1/socratic-tutor`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${supabaseKey}`
       },
       body: JSON.stringify({ action, ...payload }),
     });

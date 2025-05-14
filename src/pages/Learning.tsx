@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -111,11 +110,15 @@ const Learning = () => {
     setIsLoading(true);
     try {
       // Create a new session in the database with cleaned topic
+      console.log("Starting new session with topic:", topicInput);
       const newSession = await createSession(topicInput);
       if (!newSession) {
-        toast.error("Failed to create learning session");
+        console.error("Failed to create learning session");
+        toast.error("Failed to create learning session. Please try again.");
         return;
       }
+      
+      console.log("Session created successfully:", newSession);
       
       // Set the cleaned topic
       setTopic(newSession.topic);
@@ -126,9 +129,12 @@ const Learning = () => {
       if (session?.user) {
         await updateTopicProgress(session.user.id, newSession.topic, 5);
       }
+      
+      // Always set active tab to chat when starting a new session
+      setActiveTab("chat");
     } catch (error) {
       console.error("Error starting session:", error);
-      toast.error("Failed to create learning session");
+      toast.error("Failed to create learning session. Please check your connection and try again.");
     } finally {
       setIsLoading(false);
     }
