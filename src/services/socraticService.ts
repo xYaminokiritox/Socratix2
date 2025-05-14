@@ -129,8 +129,39 @@ export const AVAILABLE_ACHIEVEMENTS: Achievement[] = [
   }
 ];
 
+// Function to extract clean topic name from user prompt
+export const extractTopicFromPrompt = async (prompt: string): Promise<string> => {
+  try {
+    const { data, error } = await supabase.functions.invoke('socratic-tutor', {
+      body: {
+        action: 'extract_topic',
+        prompt
+      }
+    });
+
+    if (error) {
+      console.error("Error extracting topic:", error);
+      // If extraction fails, use the prompt as is but truncate if needed
+      return prompt.length > 50 ? prompt.substring(0, 47) + "..." : prompt;
+    }
+
+    // If result is empty or not a string, use the original prompt
+    if (!data.result || typeof data.result !== 'string') {
+      return prompt;
+    }
+
+    return data.result.trim();
+  } catch (error) {
+    console.error("Error extracting topic:", error);
+    return prompt;
+  }
+};
+
 // Function to start a new learning session
-export const createSession = async (topic: string): Promise<LearningSession | null> => {
+export const createSession = async (topicPrompt: string): Promise<LearningSession | null> => {
+  // First, extract a clean topic name from the user prompt
+  const cleanTopic = await extractTopicFromPrompt(topicPrompt);
+  
   // Fix: Get the user ID first, then use it in the insert operation
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
@@ -140,7 +171,7 @@ export const createSession = async (topic: string): Promise<LearningSession | nu
 
   const { data, error } = await supabase
     .from("learning_sessions")
-    .insert([{ topic, user_id: user.id }])
+    .insert([{ topic: cleanTopic, user_id: user.id }])
     .select()
     .single();
 
@@ -217,40 +248,45 @@ export const addMessage = async (
   messageType: 'question' | 'answer' | 'evaluation' | 'feedback',
   sequenceNumber: number
 ): Promise<ConversationMessage | null> => {
-  const { data, error } = await supabase
-    .from("conversation_messages")
-    .insert([{
-      session_id: sessionId,
-      content,
-      sender,
-      message_type: messageType,
-      sequence_number: sequenceNumber
-    }])
-    .select()
-    .single();
+  try {
+    const { data, error } = await supabase
+      .from("conversation_messages")
+      .insert([{
+        session_id: sessionId,
+        content,
+        sender,
+        message_type: messageType,
+        sequence_number: sequenceNumber
+      }])
+      .select()
+      .single();
 
-  if (error) {
+    if (error) {
+      console.error("Error adding message:", error);
+      return null;
+    }
+
+    // If user sends a lot of messages in one session, award the curious_mind badge
+    if (sender === 'user') {
+      const { data: messages } = await supabase
+        .from("conversation_messages")
+        .select("id")
+        .eq("session_id", sessionId)
+        .eq("sender", "user");
+      
+      if (messages && messages.length >= 10) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          await awardBadge(user.id, "curious_mind");
+        }
+      }
+    }
+
+    return data;
+  } catch (error) {
     console.error("Error adding message:", error);
     return null;
   }
-
-  // If user sends a lot of messages in one session, award the curious_mind badge
-  if (sender === 'user') {
-    const { data: messages } = await supabase
-      .from("conversation_messages")
-      .select("id")
-      .eq("session_id", sessionId)
-      .eq("sender", "user");
-    
-    if (messages && messages.length >= 10) {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        await awardBadge(user.id, "curious_mind");
-      }
-    }
-  }
-
-  return data;
 };
 
 // Function to update session with evaluation results
@@ -285,6 +321,9 @@ export const updateSessionEvaluation = async (
         await awardBadge(user.id, "deep_learner");
         await awardAchievement(user.id, "topic_mastery", data.topic);
       }
+      
+      // Update topic-specific progress
+      await updateTopicProgress(user.id, data.topic, confidenceScore);
       
       // Check for multiple topics studied
       const { data: sessions } = await supabase
@@ -333,45 +372,163 @@ export const callSocraticTutor = async (
   return data;
 };
 
-// Gamification functions
+// Function to generate flashcards for a topic using AI
+export const generateFlashcards = async (
+  topic: string,
+  numberOfCards: number = 6
+): Promise<{ question: string; answer: string }[]> => {
+  try {
+    console.log(`Generating ${numberOfCards} flashcards for topic: ${topic}`);
+    const { data, error } = await supabase.functions.invoke('socratic-tutor', {
+      body: {
+        action: 'generate_flashcards',
+        topic,
+        numberOfCards
+      }
+    });
 
-// Helper function to get user's badges from localStorage
-const getUserBadgesFromStorage = (userId: string): string[] => {
-  const key = `user_badges_${userId}`;
-  const storedBadges = localStorage.getItem(key);
-  return storedBadges ? JSON.parse(storedBadges) : [];
+    if (error) {
+      console.error("Error generating flashcards:", error);
+      throw new Error(`Error generating flashcards: ${error.message}`);
+    }
+
+    if (Array.isArray(data.result) && data.result.length > 0) {
+      console.log(`Successfully loaded flashcards: ${data.result.length}`);
+      return data.result;
+    }
+    
+    // Fallback if we don't get a proper array
+    throw new Error("Invalid response format from flashcard generation");
+  } catch (error) {
+    console.error("Error generating flashcards:", error);
+    // Return fallback content
+    return [
+      { question: `What is ${topic}?`, answer: `${topic} is a subject with specific concepts and principles that are important to understand.` },
+      { question: `Why is ${topic} significant?`, answer: `${topic} has specific applications and impact in various fields and domains.` }
+    ];
+  }
 };
 
-// Helper function to save user's badges to localStorage
-const saveUserBadgesToStorage = (userId: string, badges: string[]) => {
-  const key = `user_badges_${userId}`;
-  localStorage.setItem(key, JSON.stringify(badges));
+// Function to generate summarized notes for a topic
+export const generateSummary = async (topic: string): Promise<string> => {
+  try {
+    console.log(`Generating summary for ${topic}`);
+    const { data, error } = await supabase.functions.invoke('socratic-tutor', {
+      body: {
+        action: 'generate_summary',
+        topic
+      }
+    });
+
+    if (error) {
+      console.error("Error generating summary:", error);
+      throw new Error(`Error generating summary: ${error.message}`);
+    }
+
+    if (typeof data.result === 'string' && data.result.trim().length > 0) {
+      return data.result;
+    }
+    
+    // Fallback
+    throw new Error("Empty or invalid response from summary generation");
+  } catch (error) {
+    console.error("Error generating summary:", error);
+    return `• ${topic} is a specific field with unique characteristics and principles\n\n• Learning ${topic} involves understanding several key concepts that build upon each other\n\n• ${topic} has particular real-world applications that demonstrate its importance`;
+  }
 };
 
-// Helper function to get user's achievements from localStorage
-const getUserAchievementsFromStorage = (userId: string): {id: string, topic: string}[] => {
-  const key = `user_achievements_${userId}`;
-  const storedAchievements = localStorage.getItem(key);
-  return storedAchievements ? JSON.parse(storedAchievements) : [];
-};
+// NEW: Local Storage Helper Functions for User Progress
 
-// Helper function to save user's achievements to localStorage
-const saveUserAchievementsToStorage = (userId: string, achievements: {id: string, topic: string}[]) => {
-  const key = `user_achievements_${userId}`;
-  localStorage.setItem(key, JSON.stringify(achievements));
-};
-
-// Helper function to get user's points from localStorage
+// Helper function to get user points from localStorage
 const getUserPointsFromStorage = (userId: string): number => {
   const key = `user_points_${userId}`;
   const storedPoints = localStorage.getItem(key);
   return storedPoints ? parseInt(storedPoints) : 0;
 };
 
-// Helper function to save user's points to localStorage
+// Helper function to save user points to localStorage
 const saveUserPointsToStorage = (userId: string, points: number) => {
   const key = `user_points_${userId}`;
   localStorage.setItem(key, points.toString());
+};
+
+// Helper function to get user badges from localStorage
+const getUserBadgesFromStorage = (userId: string): string[] => {
+  const key = `user_badges_${userId}`;
+  const storedBadges = localStorage.getItem(key);
+  return storedBadges ? JSON.parse(storedBadges) : [];
+};
+
+// Helper function to save user badges to localStorage
+const saveUserBadgesToStorage = (userId: string, badges: string[]) => {
+  const key = `user_badges_${userId}`;
+  localStorage.setItem(key, JSON.stringify(badges));
+};
+
+// Helper function to get user achievements from localStorage
+const getUserAchievementsFromStorage = (userId: string): {id: string; topic: string}[] => {
+  const key = `user_achievements_${userId}`;
+  const storedAchievements = localStorage.getItem(key);
+  return storedAchievements ? JSON.parse(storedAchievements) : [];
+};
+
+// Helper function to save user achievements to localStorage
+const saveUserAchievementsToStorage = (userId: string, achievements: {id: string; topic: string}[]) => {
+  const key = `user_achievements_${userId}`;
+  localStorage.setItem(key, JSON.stringify(achievements));
+};
+
+// Helper function to get topic-specific progress from localStorage
+const getTopicProgressFromStorage = (userId: string, topic: string): number => {
+  const key = `topic_progress_${userId}_${topic.replace(/\s+/g, '_').toLowerCase()}`;
+  const storedProgress = localStorage.getItem(key);
+  return storedProgress ? parseInt(storedProgress) : 0;
+};
+
+// Helper function to save topic-specific progress to localStorage
+const saveTopicProgressToStorage = (userId: string, topic: string, progress: number) => {
+  const key = `topic_progress_${userId}_${topic.replace(/\s+/g, '_').toLowerCase()}`;
+  localStorage.setItem(key, progress.toString());
+};
+
+// Function to update topic progress
+export const updateTopicProgress = async (userId: string, topic: string, progress: number): Promise<boolean> => {
+  try {
+    if (!topic || !userId) return false;
+    
+    // Get current progress (use the highest value)
+    const currentProgress = getTopicProgressFromStorage(userId, topic);
+    const newProgress = Math.max(currentProgress, progress);
+    
+    // Only save if progress has improved
+    if (newProgress > currentProgress) {
+      saveTopicProgressToStorage(userId, topic, newProgress);
+      console.log(`Updated progress for ${topic} to ${newProgress}% for user ${userId}`);
+      
+      // Award points based on progress improvement
+      const pointsEarned = Math.floor((newProgress - currentProgress) / 10) * 5;
+      if (pointsEarned > 0) {
+        await awardPoints(userId, pointsEarned);
+      }
+    }
+    
+    return true;
+  } catch (error) {
+    console.error("Error updating topic progress:", error);
+    return false;
+  }
+};
+
+// Function to get topic progress
+export const getTopicProgress = async (userId: string, topic: string): Promise<number> => {
+  if (!topic || !userId) return 0;
+  
+  try {
+    return getTopicProgressFromStorage(userId, topic);
+  } catch (error) {
+    console.error("Error getting topic progress:", error);
+    return 0;
+  }
 };
 
 // Function to award points to a user
@@ -490,29 +647,6 @@ export const getUserPoints = async (userId: string): Promise<number> => {
   }
 };
 
-// Function to generate flashcards for a topic
-export const generateFlashcards = async (
-  topic: string,
-  numberOfCards: number = 5
-): Promise<{ question: string; answer: string }[]> => {
-  try {
-    // In a real app, we would call an AI service to generate these
-    // For the demo, we'll return some hardcoded flashcards based on the topic
-    const genericFlashcards = [
-      { question: `What is the main concept of ${topic}?`, answer: `${topic} is a field that focuses on understanding and application of key principles.` },
-      { question: `Who is considered the founder of ${topic}?`, answer: `While many contributed to ${topic}, it was formalized in the early studies.` },
-      { question: `When did ${topic} first become widely recognized?`, answer: `${topic} gained significant attention in the academic community in recent decades.` },
-      { question: `Why is ${topic} important?`, answer: `${topic} provides foundational understanding for many applications in related fields.` },
-      { question: `What are the key components of ${topic}?`, answer: `The key components include theoretical frameworks, practical applications, and analytical methods.` },
-    ];
-    
-    return genericFlashcards.slice(0, numberOfCards);
-  } catch (error) {
-    console.error("Error generating flashcards:", error);
-    return [];
-  }
-};
-
 // Function to generate a challenge quiz
 export const generateChallengeQuiz = async (
   topic: string,
@@ -526,73 +660,40 @@ export const generateChallengeQuiz = async (
   timeLimit: number;
 }> => {
   try {
-    // In a real app, we would call an AI service to generate these
-    // For the demo, we'll return some hardcoded questions based on the topic
-    const genericQuestions = [
-      {
-        question: `Which of the following best describes ${topic}?`,
-        options: [
-          `A systematic approach to understanding ${topic.toLowerCase()}`,
-          `A random collection of facts about ${topic.toLowerCase()}`,
-          `A philosophy opposed to ${topic.toLowerCase()}`,
-          `A mathematical model unrelated to ${topic.toLowerCase()}`
-        ],
-        correctAnswer: 0
-      },
-      {
-        question: `What is a key principle of ${topic}?`,
-        options: [
-          `Avoiding all practical applications`,
-          `Focusing only on theoretical frameworks`,
-          `Integration of theory and practice`,
-          `Rejecting established knowledge`
-        ],
-        correctAnswer: 2
-      },
-      {
-        question: `Which field is most closely related to ${topic}?`,
-        options: [
-          `Ancient literature`,
-          `Modern applications of ${topic.toLowerCase()}`,
-          `Unrelated scientific disciplines`,
-          `Purely fictional concepts`
-        ],
-        correctAnswer: 1
-      },
-      {
-        question: `What approach is typically used when studying ${topic}?`,
-        options: [
-          `Random guessing`,
-          `Memorization without understanding`,
-          `Analytical thinking and critical analysis`,
-          `Avoiding all theoretical frameworks`
-        ],
-        correctAnswer: 2
-      },
-      {
-        question: `Which of the following is NOT typically associated with ${topic}?`,
-        options: [
-          `Systematic research`,
-          `Thoughtful analysis`,
-          `Evidence-based conclusions`,
-          `Arbitrary assumptions without evidence`
-        ],
-        correctAnswer: 3
+    const { data, error } = await supabase.functions.invoke('socratic-tutor', {
+      body: {
+        action: 'challenge',
+        topic,
+        numberOfQuestions
       }
-    ];
+    });
+
+    if (error) {
+      throw error;
+    }
+
+    if (typeof data.result === 'object' && data.result.questions) {
+      return data.result;
+    }
     
-    // Set a time limit of 30 seconds per question
-    const timeLimit = numberOfQuestions * 30;
-    
-    return {
-      questions: genericQuestions.slice(0, numberOfQuestions),
-      timeLimit
-    };
+    throw new Error("Invalid response format from AI");
   } catch (error) {
     console.error("Error generating challenge quiz:", error);
+    // Fallback
     return {
-      questions: [],
-      timeLimit: 0
+      questions: [
+        {
+          question: `Which of the following best describes ${topic}?`,
+          options: [
+            `A systematic approach to understanding ${topic.toLowerCase()}`,
+            `A random collection of facts about ${topic.toLowerCase()}`,
+            `A philosophy opposed to ${topic.toLowerCase()}`,
+            `A mathematical model unrelated to ${topic.toLowerCase()}`
+          ],
+          correctAnswer: 0
+        }
+      ],
+      timeLimit: 30
     };
   }
 };
@@ -612,3 +713,4 @@ export const deleteSession = async (sessionId: string): Promise<boolean> => {
     return false;
   }
 };
+

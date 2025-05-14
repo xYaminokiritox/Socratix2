@@ -138,7 +138,7 @@ const ChatInterface = ({
             evaluationResponse.result.summary
           );
           
-          // Add evaluation message
+          // Add evaluation message as a special type
           const evalMessage = await addMessage(
             sessionId,
             JSON.stringify(evaluationResponse.result),
@@ -180,7 +180,7 @@ const ChatInterface = ({
             feedbackContent = feedbackMatch[1].trim();
             questionContent = questionMatch[1].trim();
             
-            // Add feedback message
+            // Add feedback message with separate message_type
             const feedbackMessage = await addMessage(
               sessionId,
               feedbackContent,
@@ -188,6 +188,10 @@ const ChatInterface = ({
               'feedback',
               nextAiSeq
             );
+            
+            if (!feedbackMessage) {
+              throw new Error("Failed to save feedback message");
+            }
             
             // Add question message
             const questionMessage = await addMessage(
@@ -198,12 +202,14 @@ const ChatInterface = ({
               nextAiSeq + 1
             );
             
-            // Update local messages state with AI's feedback and next question
-            if (feedbackMessage && questionMessage) {
-              setMessages([...updatedMessages, feedbackMessage, questionMessage]);
+            if (!questionMessage) {
+              throw new Error("Failed to save question message");
             }
+            
+            // Update local messages state with AI's feedback and next question
+            setMessages([...updatedMessages, feedbackMessage, questionMessage]);
           } else {
-            // If the response doesn't follow the expected format, just use it as-is
+            // If the response doesn't follow the expected format, just use it as-is as a question
             const aiMessage = await addMessage(
               sessionId,
               response.result,

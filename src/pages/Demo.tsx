@@ -12,7 +12,7 @@ import ChatInterface from "@/components/ChatInterface";
 import Flashcard from "@/components/Flashcard";
 import SummarizedNotes from "@/components/SummarizedNotes";
 import UserProgress from "@/components/UserProgress";
-import { createSession, getUserBadges, getUserAchievements, Badge, Achievement, awardPoints } from "@/services/socraticService";
+import { createSession, getUserBadges, getUserAchievements, Badge, Achievement, awardPoints, extractTopicFromPrompt, generateSummary } from "@/services/socraticService";
 import AchievementShare from "@/components/AchievementShare";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -25,6 +25,7 @@ const Demo = () => {
   const navigate = useNavigate();
   
   const [activeStep, setActiveStep] = useState<"input" | "learning">("input");
+  const [topicInput, setTopicInput] = useState("");
   const [topic, setTopic] = useState("");
   const [notes, setNotes] = useState("");
   const [summarizedNotes, setSummarizedNotes] = useState("");
@@ -100,7 +101,7 @@ const Demo = () => {
   }, [evaluation, session, initialBadgeCount, initialAchievementCount]);
   
   const handleStart = async () => {
-    if (!topic && !notes) {
+    if (!topicInput && !notes) {
       hookToast({
         title: "Please enter a topic or upload notes",
         description: "We need something to work with!",
@@ -119,30 +120,32 @@ const Demo = () => {
     setLearningProgress(0); // Reset progress
     
     try {
-      // Create a new session in the database
-      const actualTopic = topic || "Notes Analysis";
-      const newSession = await createSession(actualTopic);
+      // If user uploaded notes without specifying a topic, use "Notes Analysis" as the topic
+      const actualPrompt = topicInput || "Notes Analysis";
       
+      // Create a new session in the database
+      const newSession = await createSession(actualPrompt);
       if (!newSession) {
         throw new Error("Failed to create learning session");
       }
       
+      // Set the cleaned topic name
+      setTopic(newSession.topic);
       setSessionId(newSession.id);
       
-      // Generate summarized notes if we have a topic or notes
+      // Generate summarized notes
       if (notes) {
+        // If user uploaded notes, use those directly
         setSummarizedNotes(notes);
       } else {
-        setSummarizedNotes(
-          `Here are your summarized notes on ${actualTopic}:\n\n` +
-          `• ${actualTopic} is a fascinating subject with many applications\n\n` +
-          `• Learning about ${actualTopic} involves understanding key concepts and principles\n\n` +
-          `• The foundations of ${actualTopic} were established through rigorous research and study\n\n` +
-          `• Modern applications of ${actualTopic} include technological advancements and practical implementations\n\n` +
-          `• Several theories exist to explain the foundational mechanisms of ${actualTopic}\n\n` +
-          `• Understanding ${actualTopic} requires both theoretical knowledge and practical application\n\n` +
-          `• Recent developments in ${actualTopic} have opened new avenues for exploration and discovery`
-        );
+        // Generate summary for the topic
+        try {
+          const summary = await generateSummary(newSession.topic);
+          setSummarizedNotes(summary);
+        } catch (err) {
+          console.error("Error generating summary:", err);
+          setSummarizedNotes(`Key points about ${newSession.topic}:\n\n• ${newSession.topic} is a fascinating subject with many applications\n\n• Understanding ${newSession.topic} requires familiarity with core concepts`);
+        }
       }
       
       setActiveStep("learning");
@@ -184,6 +187,11 @@ const Demo = () => {
     if (result.confidence_score) {
       setLearningProgress(result.confidence_score);
     }
+    
+    // Update summary if provided
+    if (result.summary) {
+      setSummarizedNotes(result.summary);
+    }
   };
   
   const handleChallengeComplete = (score: number) => {
@@ -220,8 +228,8 @@ const Demo = () => {
                 
                 <Input
                   placeholder="Enter a topic (e.g. Photosynthesis, American Civil War, Quantum Physics)"
-                  value={topic}
-                  onChange={(e) => setTopic(e.target.value)}
+                  value={topicInput}
+                  onChange={(e) => setTopicInput(e.target.value)}
                   className="mb-4"
                 />
                 
@@ -304,7 +312,7 @@ const Demo = () => {
               
               <Flashcard topic={topic || "General Knowledge"} />
               
-              <SummarizedNotes notes={summarizedNotes} />
+              <SummarizedNotes topic={topic} notes={summarizedNotes} />
               
               {evaluation && (
                 <Button 
@@ -312,6 +320,7 @@ const Demo = () => {
                   className="w-full" 
                   onClick={() => {
                     setActiveStep("input");
+                    setTopicInput("");
                     setTopic("");
                     setNotes("");
                     setSummarizedNotes("");

@@ -16,9 +16,13 @@ import ChallengeQuiz from "@/components/ChallengeQuiz";
 import { 
   createSession, 
   getSession, 
-  getSessionMessages, 
   updateSessionEvaluation,
-  deleteSession
+  deleteSession,
+  getTopicProgress,
+  updateTopicProgress,
+  extractTopicFromPrompt,
+  generateSummary,
+  awardBadge
 } from "@/services/socraticService";
 
 const Learning = () => {
@@ -27,6 +31,7 @@ const Learning = () => {
   const { sessionId } = useParams();
   
   const [isLoading, setIsLoading] = useState(false);
+  const [topicInput, setTopicInput] = useState("");
   const [topic, setTopic] = useState("");
   const [activeSession, setActiveSession] = useState<string | null>(sessionId || null);
   const [summarizedNotes, setSummarizedNotes] = useState("");
@@ -52,29 +57,41 @@ const Learning = () => {
       if (sessionData) {
         setTopic(sessionData.topic);
         
-        // Generate or load summarized notes
-        const notesContent = sessionData.summary || 
-          `Here are your summarized notes on ${sessionData.topic}:\n\n` +
-          `• ${sessionData.topic} is a fascinating subject with many applications\n\n` +
-          `• Learning about ${sessionData.topic} involves understanding key concepts and principles\n\n` +
-          `• The foundations of ${sessionData.topic} were established through rigorous research and study\n\n` +
-          `• Modern applications of ${sessionData.topic} include technological advancements and practical implementations\n\n` +
-          `• Several theories exist to explain the foundational mechanisms of ${sessionData.topic}\n\n` +
-          `• Understanding ${sessionData.topic} requires both theoretical knowledge and practical application\n\n` +
-          `• Recent developments in ${sessionData.topic} have opened new avenues for exploration and discovery`;
+        if (session?.user) {
+          // Get topic-specific progress
+          const savedProgress = await getTopicProgress(session.user.id, sessionData.topic);
+          if (savedProgress > 0) {
+            setLearningProgress(savedProgress);
+          } else if (sessionData.confidence_score) {
+            setLearningProgress(sessionData.confidence_score);
+            // Save progress for this topic
+            await updateTopicProgress(session.user.id, sessionData.topic, sessionData.confidence_score);
+          } else {
+            setLearningProgress(5); // Default progress for ongoing sessions
+          }
+        }
         
-        setSummarizedNotes(notesContent);
+        // Load or generate summarized notes
+        if (sessionData.summary) {
+          setSummarizedNotes(sessionData.summary);
+        } else {
+          // Generate new summary for the topic
+          try {
+            const summary = await generateSummary(sessionData.topic);
+            setSummarizedNotes(summary);
+          } catch (err) {
+            console.error("Error generating summary:", err);
+            setSummarizedNotes(`• ${sessionData.topic} has key concepts to understand\n\n• ${sessionData.topic} applies to various fields and disciplines\n\n• Learning ${sessionData.topic} builds critical thinking skills`);
+          }
+        }
         
-        // Set learning progress
+        // Set evaluation if session is completed
         if (sessionData.completed) {
           setEvaluation({
             completed: sessionData.completed,
             confidence_score: sessionData.confidence_score || 0,
             summary: sessionData.summary || ""
           });
-          setLearningProgress(sessionData.confidence_score || 0);
-        } else {
-          setLearningProgress(30); // Default progress for ongoing sessions
         }
       } else {
         toast.error("Session not found");
@@ -89,45 +106,48 @@ const Learning = () => {
   };
 
   const startSession = async () => {
-    if (!topic.trim()) {
+    if (!topicInput.trim()) {
       toast.error("Please enter a topic to start learning");
       return;
     }
 
     setIsLoading(true);
     try {
-      // Create a new session in the database
-      const newSession = await createSession(topic);
+      // Create a new session in the database with cleaned topic
+      const newSession = await createSession(topicInput);
       if (!newSession) {
         toast.error("Failed to create learning session");
         return;
       }
+      
+      // Set the cleaned topic
+      setTopic(newSession.topic);
 
       // Generate initial summary for new topic
-      setSummarizedNotes(
-        `Here are your summarized notes on ${topic}:\n\n` +
-        `• ${topic} is a fascinating subject with many applications\n\n` +
-        `• Learning about ${topic} involves understanding key concepts and principles\n\n` +
-        `• The foundations of ${topic} were established through rigorous research and study\n\n` +
-        `• Modern applications of ${topic} include technological advancements and practical implementations\n\n` +
-        `• Several theories exist to explain the foundational mechanisms of ${topic}\n\n` +
-        `• Understanding ${topic} requires both theoretical knowledge and practical application\n\n` +
-        `• Recent developments in ${topic} have opened new avenues for exploration and discovery`
-      );
+      try {
+        const summary = await generateSummary(newSession.topic);
+        setSummarizedNotes(summary);
+      } catch (err) {
+        console.error("Error generating summary:", err);
+        setSummarizedNotes(`• ${newSession.topic} has key concepts to understand\n\n• ${newSession.topic} applies to various fields and disciplines\n\n• Learning ${newSession.topic} builds critical thinking skills`);
+      }
 
       setActiveSession(newSession.id);
       
       // Start with initial progress
       setLearningProgress(5);
+      if (session?.user) {
+        await updateTopicProgress(session.user.id, newSession.topic, 5);
+      }
     } catch (error) {
       console.error("Error starting session:", error);
-      toast.error("Failed to start learning session");
+      toast.error("Failed to create learning session");
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleEvaluationComplete = (result: {
+  const handleEvaluationComplete = async (result: {
     completed: boolean;
     confidence_score: number;
     summary: string;
@@ -142,12 +162,29 @@ const Learning = () => {
     // Set final progress based on evaluation
     if (result.confidence_score) {
       setLearningProgress(result.confidence_score);
+      
+      // Save topic-specific progress
+      if (session?.user && topic) {
+        await updateTopicProgress(session.user.id, topic, result.confidence_score);
+      }
     }
   };
   
-  const handleChallengeComplete = (score: number) => {
+  const handleChallengeComplete = async (score: number) => {
     setShowChallengeMode(false);
+    
+    // Update progress if the score is higher
+    if (score > learningProgress && session?.user && topic) {
+      setLearningProgress(score);
+      await updateTopicProgress(session.user.id, topic, score);
+    }
+    
     toast.success(`Challenge completed with ${score}% score!`);
+    
+    // Award quiz_master badge if score is very high
+    if (score >= 90 && session?.user) {
+      await awardBadge(session.user.id, "quiz_master");
+    }
   };
   
   const handleDeleteSession = async () => {
@@ -187,8 +224,8 @@ const Learning = () => {
                   <Input
                     id="topic"
                     placeholder="e.g., Photosynthesis, American Revolution, Neural Networks..."
-                    value={topic}
-                    onChange={(e) => setTopic(e.target.value)}
+                    value={topicInput}
+                    onChange={(e) => setTopicInput(e.target.value)}
                     className="w-full"
                   />
                 </div>
@@ -198,7 +235,7 @@ const Learning = () => {
               <Button 
                 className="w-full" 
                 onClick={startSession} 
-                disabled={isLoading || !topic.trim()}
+                disabled={isLoading || !topicInput.trim()}
               >
                 {isLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Brain className="h-4 w-4 mr-2" />}
                 Start Socratic Dialogue
@@ -286,7 +323,7 @@ const Learning = () => {
                 
                 <Flashcard topic={topic} />
                 
-                <SummarizedNotes notes={summarizedNotes} />
+                <SummarizedNotes topic={topic} notes={summarizedNotes} />
                 
                 {evaluation && (
                   <Button 
