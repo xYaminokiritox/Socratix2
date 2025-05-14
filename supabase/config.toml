@@ -2,4 +2,4 @@
 project_id = "bhirorpogkfnafuxfkox"
 
 [functions.socratic-tutor]
-verify_jwt = false
+verify_jwt = true

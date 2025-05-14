@@ -1,3 +1,4 @@
+
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -33,8 +34,6 @@ const ChatInterface = ({
   const [isLoading, setIsLoading] = useState(false);
   const [userLevel, setUserLevel] = useState<'beginner' | 'intermediate' | 'advanced'>('beginner');
   const [responseTiming, setResponseTiming] = useState<'normal' | 'fast' | 'slow'>('normal');
-  const [initialized, setInitialized] = useState(false);
-  const [initAttempted, setInitAttempted] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
   // Scroll to bottom of messages
@@ -44,120 +43,43 @@ const ChatInterface = ({
   
   // Start session if we have a topic but no messages yet
   useEffect(() => {
-    const initializeChat = async () => {
-      if (sessionId && topic && messages.length === 0 && !initialized && !initAttempted) {
-        setInitialized(true);
-        setInitAttempted(true);
-        await startConversation();
-      }
-    };
-
-    if (sessionId && topic) {
-      initializeChat();
+    if (sessionId && topic && messages.length === 0) {
+      startConversation();
     }
-  }, [sessionId, topic, messages.length, initialized, initAttempted]);
+  }, [sessionId, topic, messages.length]);
   
   const startConversation = async () => {
     if (!sessionId || !topic) return;
     
     setIsLoading(true);
     try {
-      console.log("Starting new conversation for topic:", topic);
-      
       // Get first question from AI
       const response = await callSocraticTutor('start', { topic });
-      
-      if (response.error) {
-        console.error(`Error: ${response.error}`);
-        toast.error(`Error: ${response.error}`);
-        
-        // Add a fallback message if the API call fails
-        const fallbackMessage = {
-          id: `fallback-${Date.now()}`,
-          session_id: sessionId,
-          content: `Let's begin our exploration of ${topic}. What do you already know about this subject?`,
-          sender: 'ai',
-          message_type: 'question',
-          sequence_number: 1
-        };
-        
-        setMessages([fallbackMessage]);
-        return;
-      }
-      
       if (typeof response.result === 'string') {
-        console.log("Got first question:", response.result);
-        
-        try {
-          // Add AI's first question to the conversation
-          const aiMessage = await addMessage(
-            sessionId,
-            response.result,
-            'ai',
-            'question',
-            1
-          );
+        // Add AI's first question to the conversation
+        const aiMessage = await addMessage(
+          sessionId,
+          response.result,
+          'ai',
+          'question',
+          1
+        );
 
-          // Update local messages state if we got a valid response
-          if (aiMessage) {
-            setMessages([aiMessage]);
-          } else {
-            // If message wasn't saved to the database, still show it locally
-            setMessages([{
-              id: `local-${Date.now()}`,
-              session_id: sessionId,
-              content: response.result,
-              sender: 'ai',
-              message_type: 'question',
-              sequence_number: 1
-            }]);
-          }
-        } catch (saveError) {
-          console.error("Error saving message:", saveError);
-          // Show message locally even if it couldn't be saved
-          setMessages([{
-            id: `local-${Date.now()}`,
-            session_id: sessionId,
-            content: response.result,
-            sender: 'ai',
-            message_type: 'question',
-            sequence_number: 1
-          }]);
+        // Update local messages state if we got a valid response
+        if (aiMessage) {
+          setMessages([aiMessage]);
         }
-      } else {
-        console.error("Unexpected response format:", response);
-        toast.error("Received an invalid response from the AI");
-        
-        // Add a fallback message
-        setMessages([{
-          id: `fallback-${Date.now()}`,
-          session_id: sessionId,
-          content: `Let's begin our exploration of ${topic}. What do you already know about this subject?`,
-          sender: 'ai',
-          message_type: 'question',
-          sequence_number: 1
-        }]);
       }
     } catch (error) {
       console.error("Error starting conversation:", error);
-      toast.error("Failed to start the conversation. Please try refreshing.");
-      
-      // Add a fallback message
-      setMessages([{
-        id: `fallback-${Date.now()}`,
-        session_id: sessionId,
-        content: `Let's begin our exploration of ${topic}. What do you already know about this subject?`,
-        sender: 'ai',
-        message_type: 'question',
-        sequence_number: 1
-      }]);
+      toast.error("Failed to start the conversation");
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleSendMessage = async () => {
-    if (!input.trim() || !sessionId || isLoading) return;
+    if (!input.trim() || !sessionId) return;
     
     const userMessage = input.trim();
     setInput("");
@@ -169,8 +91,6 @@ const ChatInterface = ({
       // Calculate the next sequence numbers
       const nextUserSeq = messages.length + 1;
       const nextAiSeq = nextUserSeq + 1;
-      
-      console.log(`Adding user message with seq ${nextUserSeq}`);
       
       // Save user's response to the database
       const savedUserMsg = await addMessage(
@@ -201,8 +121,6 @@ const ChatInterface = ({
       const shouldEvaluate = userMessagesCount >= 5;
       
       if (shouldEvaluate) {
-        console.log("User messages reached threshold, evaluating conversation");
-        
         // Call AI to evaluate the conversation
         const evaluationResponse = await callSocraticTutor('evaluate', {
           topic,
@@ -211,14 +129,7 @@ const ChatInterface = ({
           responseTiming
         });
         
-        if (evaluationResponse.error) {
-          toast.error(`Evaluation error: ${evaluationResponse.error}`);
-          return;
-        }
-        
-        if (typeof evaluationResponse.result !== 'string' && evaluationResponse.result) {
-          console.log("Received evaluation:", evaluationResponse.result);
-          
+        if (typeof evaluationResponse.result !== 'string') {
           // Save evaluation results
           await updateSessionEvaluation(
             sessionId,
@@ -227,7 +138,7 @@ const ChatInterface = ({
             evaluationResponse.result.summary
           );
           
-          // Add evaluation message as a special type
+          // Add evaluation message
           const evalMessage = await addMessage(
             sessionId,
             JSON.stringify(evaluationResponse.result),
@@ -246,13 +157,8 @@ const ChatInterface = ({
           }
           
           toast.success("Learning session completed!");
-        } else {
-          console.error("Invalid evaluation response:", evaluationResponse);
-          toast.error("Failed to evaluate your learning session");
         }
       } else {
-        console.log("Continuing conversation with next AI response");
-        
         // Continue the conversation with next AI question
         const response = await callSocraticTutor('continue', {
           userResponse: userMessage,
@@ -261,14 +167,7 @@ const ChatInterface = ({
           responseTiming
         });
         
-        if (response.error) {
-          toast.error(`Error: ${response.error}`);
-          return;
-        }
-        
         if (typeof response.result === 'string') {
-          console.log("Received AI response:", response.result.substring(0, 100) + "...");
-          
           // Parse the response - looking for feedback and question sections
           let feedbackContent = "";
           let questionContent = response.result;
@@ -281,56 +180,30 @@ const ChatInterface = ({
             feedbackContent = feedbackMatch[1].trim();
             questionContent = questionMatch[1].trim();
             
-            console.log("Parsed feedback:", feedbackContent.substring(0, 50) + "...");
-            console.log("Parsed question:", questionContent.substring(0, 50) + "...");
+            // Add feedback message
+            const feedbackMessage = await addMessage(
+              sessionId,
+              feedbackContent,
+              'ai',
+              'feedback',
+              nextAiSeq
+            );
             
-            try {
-              // Add feedback message with separate message_type
-              const feedbackMessage = await addMessage(
-                sessionId,
-                feedbackContent,
-                'ai',
-                'feedback',
-                nextAiSeq
-              );
-              
-              if (!feedbackMessage) {
-                throw new Error("Failed to save feedback message");
-              }
-              
-              // Add question message
-              const questionMessage = await addMessage(
-                sessionId,
-                questionContent,
-                'ai',
-                'question',
-                nextAiSeq + 1
-              );
-              
-              if (!questionMessage) {
-                throw new Error("Failed to save question message");
-              }
-              
-              // Update local messages state with AI's feedback and next question
+            // Add question message
+            const questionMessage = await addMessage(
+              sessionId,
+              questionContent,
+              'ai',
+              'question',
+              nextAiSeq + 1
+            );
+            
+            // Update local messages state with AI's feedback and next question
+            if (feedbackMessage && questionMessage) {
               setMessages([...updatedMessages, feedbackMessage, questionMessage]);
-            } catch (error) {
-              console.error("Error saving AI response messages:", error);
-              
-              // Fallback: add as single message if saving separate messages fails
-              const aiMessage = await addMessage(
-                sessionId,
-                response.result,
-                'ai',
-                'question',
-                nextAiSeq
-              );
-              
-              if (aiMessage) {
-                setMessages([...updatedMessages, aiMessage]);
-              }
             }
           } else {
-            // If the response doesn't follow the expected format, just use it as-is as a question
+            // If the response doesn't follow the expected format, just use it as-is
             const aiMessage = await addMessage(
               sessionId,
               response.result,
@@ -344,14 +217,11 @@ const ChatInterface = ({
               setMessages([...updatedMessages, aiMessage]);
             }
           }
-        } else {
-          console.error("Unexpected response format:", response);
-          toast.error("Received an invalid response from the AI");
         }
       }
     } catch (error) {
       console.error("Error in conversation:", error);
-      toast.error("Failed to process your response. Please try again.");
+      toast.error("Failed to process your response");
     } finally {
       setIsLoading(false);
       
@@ -411,13 +281,6 @@ const ChatInterface = ({
     setResponseTiming(newTiming);
     console.log(`Response timing: ${newTiming} (${responseTimeSeconds.toFixed(1)}s)`);
   };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey && !isLoading) {
-      e.preventDefault();
-      handleSendMessage();
-    }
-  };
   
   return (
     <Card className="h-[600px] flex flex-col">
@@ -440,15 +303,6 @@ const ChatInterface = ({
           <div className="h-full flex flex-col items-center justify-center text-muted-foreground">
             <MessageSquare className="h-10 w-10 mb-2 opacity-50" />
             <p>Start your learning journey with Socratic questioning</p>
-            {initAttempted && sessionId && topic && (
-              <Button 
-                onClick={startConversation} 
-                variant="outline" 
-                className="mt-4"
-              >
-                Retry Conversation Start
-              </Button>
-            )}
           </div>
         )}
         
@@ -545,13 +399,15 @@ const ChatInterface = ({
             className="resize-none flex-1"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            disabled={isLoading || !sessionId || messages.length === 0}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                handleSendMessage();
+              }
+            }}
+            disabled={isLoading || !sessionId}
           />
-          <Button 
-            onClick={handleSendMessage} 
-            disabled={!input.trim() || isLoading || !sessionId || messages.length === 0}
-          >
+          <Button onClick={handleSendMessage} disabled={!input.trim() || isLoading || !sessionId}>
             {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           </Button>
         </div>
