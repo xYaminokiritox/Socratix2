@@ -1,3 +1,4 @@
+
 export interface ConversationMessage {
   id?: string;
   session_id: string;
@@ -7,6 +8,74 @@ export interface ConversationMessage {
   sequence_number: number;
   created_at?: string;
 }
+
+export interface Badge {
+  id: string;
+  name: string;
+  description: string;
+  image: string; // emoji or icon representation
+  created_at?: string;
+}
+
+export interface Achievement {
+  id: string;
+  name: string;
+  description: string;
+  image: string; // emoji or icon representation
+  linkedinTitle?: string;
+  linkedinDescription?: string;
+  created_at?: string;
+}
+
+export interface LearningSession {
+  id: string;
+  topic: string;
+  completed: boolean;
+  confidence_score: number;
+  summary: string;
+  created_at: string;
+  user_id?: string;
+}
+
+// Mock data for badges
+const BADGES = [
+  { id: 'quiz_master', name: 'Quiz Master', description: 'Scored 90% or higher on a challenge quiz', image: '🏆' },
+  { id: 'first_session', name: 'First Steps', description: 'Completed your first learning session', image: '🌱' },
+  { id: 'streak_3', name: 'Learning Streak', description: 'Learned for 3 days in a row', image: '🔥' },
+  { id: 'question_asker', name: 'Curious Mind', description: 'Asked 10 questions in learning sessions', image: '❓' },
+];
+
+// Mock data for flashcards
+const MOCK_FLASHCARDS = {
+  "JavaScript": [
+    { question: "What is a closure in JavaScript?", answer: "A closure is the combination of a function and the lexical environment within which that function was declared." },
+    { question: "What is the difference between == and === in JavaScript?", answer: "== compares values with type coercion, while === compares both values and types without coercion." },
+  ],
+  "Python": [
+    { question: "What are Python decorators?", answer: "Decorators are functions that modify the functionality of another function." },
+    { question: "What is the difference between a list and a tuple in Python?", answer: "Lists are mutable, while tuples are immutable." },
+  ],
+};
+
+// Mock data for learning sessions
+const MOCK_SESSIONS = [
+  { 
+    id: '1', 
+    topic: 'JavaScript Basics', 
+    completed: true, 
+    confidence_score: 85,
+    summary: 'JavaScript is a high-level programming language used for web development.',
+    created_at: '2023-03-15T10:30:00Z',
+  },
+  { 
+    id: '2', 
+    topic: 'React Hooks', 
+    completed: false, 
+    confidence_score: 0,
+    summary: '',
+    created_at: '2023-03-16T14:45:00Z',
+  },
+];
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -194,6 +263,17 @@ export const getSession = async (sessionId: string): Promise<any | null> => {
   }
 };
 
+// Function to get all learning sessions for a user
+export const getUserSessions = async (userId?: string): Promise<LearningSession[]> => {
+  try {
+    // For mock data, just return the mock sessions
+    return MOCK_SESSIONS;
+  } catch (error) {
+    console.error("Error in getUserSessions:", error);
+    return [];
+  }
+};
+
 // Function to add a message to a learning session
 export const addMessage = async (
   sessionId: string,
@@ -358,27 +438,86 @@ export const generateFlashcards = async (topic: string, numberOfCards: number = 
   }
 };
 
+// Function to generate challenge quiz
+export const generateChallengeQuiz = async (topic: string): Promise<{ 
+  questions: { question: string; options: string[]; correctAnswer: number }[];
+  timeLimit: number;
+}> => {
+  try {
+    // In a real application, this would call the socratic tutor
+    // For now, return a mock quiz
+    return {
+      questions: [
+        {
+          question: `What is a key concept in ${topic}?`,
+          options: ["Option A", "Option B", "Option C", "Option D"],
+          correctAnswer: 1
+        },
+        {
+          question: `How would you apply ${topic} in a real-world scenario?`,
+          options: ["Method 1", "Method 2", "Method 3", "Method 4"],
+          correctAnswer: 2
+        },
+        {
+          question: `Which statement about ${topic} is false?`,
+          options: ["Statement A", "Statement B", "Statement C", "Statement D"],
+          correctAnswer: 3
+        }
+      ],
+      timeLimit: 60 // seconds
+    };
+  } catch (error) {
+    console.error("Error generating challenge quiz:", error);
+    throw new Error(`Failed to generate challenge quiz: ${error.message}`);
+  }
+};
+
 // Function to award a badge to a user
-export const awardBadge = async (userId: string, badgeName: string): Promise<void> => {
+export const awardBadge = async (userId: string, badgeId: string): Promise<void> => {
   try {
     // Get existing badges
     const existingBadges = getUserBadgesFromStorage(userId);
 
     // Check if badge already exists
-    if (existingBadges.includes(badgeName)) {
-      console.log(`User ${userId} already has badge ${badgeName}`);
+    if (existingBadges.some(badge => badge.id === badgeId)) {
+      console.log(`User ${userId} already has badge ${badgeId}`);
+      return;
+    }
+
+    // Find the badge to add
+    const badgeToAdd = BADGES.find(badge => badge.id === badgeId);
+    if (!badgeToAdd) {
+      console.error(`Badge ${badgeId} not found`);
       return;
     }
 
     // Add the new badge
-    const updatedBadges = [...existingBadges, badgeName];
+    const updatedBadges = [...existingBadges, badgeToAdd];
 
     // Save updated badges
     saveUserBadgesToStorage(userId, updatedBadges);
 
-    console.log(`Awarded badge ${badgeName} to user ${userId}`);
+    console.log(`Awarded badge ${badgeId} to user ${userId}`);
   } catch (error) {
     console.error("Error awarding badge:", error);
+  }
+};
+
+// Function to award points to a user
+export const awardPoints = async (userId: string, points: number): Promise<void> => {
+  try {
+    // Get current points
+    const currentPoints = getUserPointsFromStorage(userId);
+    
+    // Add new points
+    const updatedPoints = currentPoints + points;
+    
+    // Save updated points
+    saveUserPointsToStorage(userId, updatedPoints);
+    
+    console.log(`Awarded ${points} points to user ${userId}, total: ${updatedPoints}`);
+  } catch (error) {
+    console.error("Error awarding points:", error);
   }
 };
 
@@ -393,6 +532,11 @@ export const getUserPointsFromStorage = (userId: string): number => {
   }
 };
 
+// Function to get user points
+export const getUserPoints = (userId: string): number => {
+  return getUserPointsFromStorage(userId);
+};
+
 export const saveUserPointsToStorage = (userId: string, points: number): void => {
   try {
     localStorage.setItem(`user_points_${userId}`, points.toString());
@@ -402,36 +546,69 @@ export const saveUserPointsToStorage = (userId: string, points: number): void =>
 };
 
 // User badges storage
-export const getUserBadgesFromStorage = (userId: string): string[] => {
+export const getUserBadgesFromStorage = (userId: string): Badge[] => {
   try {
     const badgesData = localStorage.getItem(`user_badges_${userId}`);
-    return badgesData ? JSON.parse(badgesData) : [];
+    if (badgesData) {
+      // Parse the stored badge IDs
+      const badgeIds: string[] = JSON.parse(badgesData);
+      // Return the full badge objects
+      return badgeIds.map(id => {
+        const badge = BADGES.find(b => b.id === id);
+        return badge || { id: 'unknown', name: 'Unknown Badge', description: 'Badge not found', image: '❓' };
+      });
+    }
+    return [BADGES[1]]; // Return first badge for demo purposes
   } catch (error) {
     console.error("Error getting user badges from storage:", error);
     return [];
   }
 };
 
-export const saveUserBadgesToStorage = (userId: string, badges: string[]): void => {
+// Function to get user badges
+export const getUserBadges = (userId: string): Badge[] => {
+  return getUserBadgesFromStorage(userId);
+};
+
+export const saveUserBadgesToStorage = (userId: string, badges: Badge[]): void => {
   try {
-    localStorage.setItem(`user_badges_${userId}`, JSON.stringify(badges));
+    // Store just the badge IDs
+    const badgeIds = badges.map(badge => badge.id);
+    localStorage.setItem(`user_badges_${userId}`, JSON.stringify(badgeIds));
   } catch (error) {
     console.error("Error saving user badges to storage:", error);
   }
 };
 
 // User achievements storage
-export const getUserAchievementsFromStorage = (userId: string): string[] => {
+export const getUserAchievementsFromStorage = (userId: string): (Achievement & {topic: string})[] => {
   try {
     const achievementsData = localStorage.getItem(`user_achievements_${userId}`);
-    return achievementsData ? JSON.parse(achievementsData) : [];
+    if (achievementsData) {
+      return JSON.parse(achievementsData);
+    }
+    // Return a demo achievement
+    return [{ 
+      id: 'a1', 
+      name: 'Python Master', 
+      description: 'Completed Python learning path with 90% mastery', 
+      image: '🐍',
+      topic: 'Python',
+      linkedinTitle: 'Python Mastery Achievement',
+      linkedinDescription: 'I completed the Python learning path on Socratix with 90% understanding!'
+    }];
   } catch (error) {
     console.error("Error getting user achievements from storage:", error);
     return [];
   }
 };
 
-export const saveUserAchievementsToStorage = (userId: string, achievements: string[]): void => {
+// Function to get user achievements
+export const getUserAchievements = (userId: string): (Achievement & {topic: string})[] => {
+  return getUserAchievementsFromStorage(userId);
+};
+
+export const saveUserAchievementsToStorage = (userId: string, achievements: (Achievement & {topic: string})[]): void => {
   try {
     localStorage.setItem(`user_achievements_${userId}`, JSON.stringify(achievements));
   } catch (error) {

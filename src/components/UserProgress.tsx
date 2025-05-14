@@ -57,7 +57,7 @@ const UserProgress = () => {
       // Load progress for each topic the user has studied
       const topicProgressesPromises = Array.from(uniqueTopics).map(async (topic) => {
         const progress = await getTopicProgress(userId, topic);
-        return { topic, progress };
+        return { topic, progress } as TopicProgress;
       });
       
       const loadedTopicProgresses = await Promise.all(topicProgressesPromises);
