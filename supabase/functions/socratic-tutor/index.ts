@@ -32,12 +32,24 @@ serve(async (req) => {
       throw new Error('OpenAI API key not found');
     }
 
-    const { action, topic, sessionId, userResponse, conversationHistory, userLevel, responseTiming } = await req.json() as SocraticRequest;
+    console.log("Request received");
+    let body: SocraticRequest;
+    try {
+      body = await req.json() as SocraticRequest;
+      console.log("Request body:", JSON.stringify(body));
+    } catch (e) {
+      console.error("Error parsing request body:", e);
+      throw new Error("Invalid request body");
+    }
+
+    const { action, topic, sessionId, userResponse, conversationHistory, userLevel, responseTiming } = body;
     
     let messages: { role: string; content: string }[] = [];
     
     if (action === 'start') {
       // Starting a new Socratic session
+      console.log(`Starting new session about ${topic}`);
+      
       messages = [
         {
           role: 'system',
@@ -57,6 +69,8 @@ serve(async (req) => {
       if (!conversationHistory || !userResponse) {
         throw new Error('Missing conversation history or user response');
       }
+      
+      console.log(`Continuing conversation with user response: ${userResponse.substring(0, 30)}...`);
       
       // Adapt difficulty based on user responses
       const difficultyAdjustment = userLevel ? 
@@ -94,6 +108,8 @@ serve(async (req) => {
         throw new Error('Missing conversation history or topic');
       }
       
+      console.log(`Evaluating conversation about ${topic}`);
+      
       messages = [
         {
           role: 'system',
@@ -113,6 +129,8 @@ serve(async (req) => {
       if (!topic) {
         throw new Error('Missing topic for challenge');
       }
+      
+      console.log(`Creating challenge quiz about ${topic}`);
       
       messages = [
         {
@@ -146,59 +164,73 @@ serve(async (req) => {
       throw new Error('Invalid action specified');
     }
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openAIApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages,
-      }),
-    });
+    console.log(`Sending request to OpenAI with ${messages.length} messages`);
+    console.log("First message:", messages[0].content.substring(0, 50) + "...");
 
-    const data = await response.json();
-    
-    if (!response.ok) {
-      throw new Error(`OpenAI API error: ${data.error?.message || 'Unknown error'}`);
-    }
+    try {
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${openAIApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages,
+        }),
+      });
 
-    const result = data.choices[0].message.content;
-    
-    // For evaluation or challenge action, parse the response as JSON
-    let parsedResult = result;
-    if (action === 'evaluate' || action === 'challenge') {
-      try {
-        // Extract JSON from the response if it's not already valid JSON
-        const jsonMatch = result.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          parsedResult = JSON.parse(jsonMatch[0]);
-        } else {
-          parsedResult = JSON.parse(result);
-        }
-      } catch (e) {
-        console.error(`Failed to parse ${action} result as JSON:`, e);
-        // Provide a fallback structured response
-        if (action === 'evaluate') {
-          parsedResult = {
-            completed: false,
-            confidence_score: 0,
-            summary: "Unable to evaluate the conversation.",
-            feedback: "Please continue the conversation to receive a more accurate evaluation."
-          };
-        } else {
-          parsedResult = {
-            questions: [],
-            timeLimit: 0
-          };
+      if (!response.ok) {
+        const errorData = await response.text();
+        console.error("OpenAI API error status:", response.status);
+        console.error("OpenAI API error response:", errorData);
+        throw new Error(`OpenAI API error: ${response.status} ${errorData}`);
+      }
+
+      const data = await response.json();
+      const result = data.choices[0].message.content;
+      
+      console.log("OpenAI response received:", result.substring(0, 50) + "...");
+      
+      // For evaluation or challenge action, parse the response as JSON
+      let parsedResult = result;
+      if (action === 'evaluate' || action === 'challenge') {
+        try {
+          // Extract JSON from the response if it's not already valid JSON
+          const jsonMatch = result.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            parsedResult = JSON.parse(jsonMatch[0]);
+          } else {
+            parsedResult = JSON.parse(result);
+          }
+          console.log("Parsed JSON response");
+        } catch (e) {
+          console.error(`Failed to parse ${action} result as JSON:`, e);
+          // Provide a fallback structured response
+          if (action === 'evaluate') {
+            parsedResult = {
+              completed: false,
+              confidence_score: 0,
+              summary: "Unable to evaluate the conversation.",
+              feedback: "Please continue the conversation to receive a more accurate evaluation."
+            };
+          } else {
+            parsedResult = {
+              questions: [],
+              timeLimit: 0
+            };
+          }
+          console.log("Using fallback response");
         }
       }
-    }
 
-    return new Response(JSON.stringify({ result: parsedResult }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+      return new Response(JSON.stringify({ result: parsedResult }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    } catch (error) {
+      console.error("Error calling OpenAI:", error);
+      throw error;
+    }
   } catch (error) {
     console.error('Error in socratic-tutor function:', error);
     return new Response(JSON.stringify({ error: error.message }), {

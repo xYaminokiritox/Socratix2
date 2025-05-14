@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { Tables } from "@/integrations/supabase/types";
 
@@ -13,6 +12,7 @@ export interface SocraticResponse {
     summary: string;
     feedback?: string; // Added feedback field for user response evaluation
   };
+  error?: string;
 }
 
 // Gamification types
@@ -131,35 +131,40 @@ export const AVAILABLE_ACHIEVEMENTS: Achievement[] = [
 
 // Function to start a new learning session
 export const createSession = async (topic: string): Promise<LearningSession | null> => {
-  // Fix: Get the user ID first, then use it in the insert operation
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    console.error("No authenticated user found");
-    return null;
+  try {
+    // Get the user ID first, then use it in the insert operation
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      console.error("No authenticated user found");
+      return null;
+    }
+
+    const { data, error } = await supabase
+      .from("learning_sessions")
+      .insert([{ topic, user_id: user.id }])
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Error creating session:", error);
+      throw error;
+    }
+
+    // Award the "first_session" badge if this is their first session
+    const { data: sessions } = await supabase
+      .from("learning_sessions")
+      .select("id")
+      .eq("user_id", user.id);
+      
+    if (sessions && sessions.length === 1) {
+      await awardBadge(user.id, "first_session");
+    }
+
+    return data;
+  } catch (error) {
+    console.error("Error in createSession:", error);
+    throw error;
   }
-
-  const { data, error } = await supabase
-    .from("learning_sessions")
-    .insert([{ topic, user_id: user.id }])
-    .select()
-    .single();
-
-  if (error) {
-    console.error("Error creating session:", error);
-    return null;
-  }
-
-  // Award the "first_session" badge if this is their first session
-  const { data: sessions } = await supabase
-    .from("learning_sessions")
-    .select("id")
-    .eq("user_id", user.id);
-    
-  if (sessions && sessions.length === 1) {
-    await awardBadge(user.id, "first_session");
-  }
-
-  return data;
 };
 
 // Function to get a session by ID
@@ -217,40 +222,47 @@ export const addMessage = async (
   messageType: 'question' | 'answer' | 'evaluation' | 'feedback',
   sequenceNumber: number
 ): Promise<ConversationMessage | null> => {
-  const { data, error } = await supabase
-    .from("conversation_messages")
-    .insert([{
-      session_id: sessionId,
-      content,
-      sender,
-      message_type: messageType,
-      sequence_number: sequenceNumber
-    }])
-    .select()
-    .single();
-
-  if (error) {
-    console.error("Error adding message:", error);
-    return null;
-  }
-
-  // If user sends a lot of messages in one session, award the curious_mind badge
-  if (sender === 'user') {
-    const { data: messages } = await supabase
-      .from("conversation_messages")
-      .select("id")
-      .eq("session_id", sessionId)
-      .eq("sender", "user");
+  try {
+    console.log(`Adding message - type: ${messageType}, sender: ${sender}, content: ${content.substring(0, 30)}...`);
     
-    if (messages && messages.length >= 10) {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        await awardBadge(user.id, "curious_mind");
+    const { data, error } = await supabase
+      .from("conversation_messages")
+      .insert([{
+        session_id: sessionId,
+        content,
+        sender,
+        message_type: messageType,
+        sequence_number: sequenceNumber
+      }])
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Error adding message:", error);
+      throw new Error(`Failed to add message: ${error.message}`);
+    }
+
+    // If user sends a lot of messages in one session, award the curious_mind badge
+    if (sender === 'user') {
+      const { data: messages } = await supabase
+        .from("conversation_messages")
+        .select("id")
+        .eq("session_id", sessionId)
+        .eq("sender", "user");
+      
+      if (messages && messages.length >= 10) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          await awardBadge(user.id, "curious_mind");
+        }
       }
     }
-  }
 
-  return data;
+    return data;
+  } catch (error) {
+    console.error("Error in addMessage:", error);
+    throw error;
+  }
 };
 
 // Function to update session with evaluation results
@@ -318,19 +330,29 @@ export const callSocraticTutor = async (
     responseTiming?: 'normal' | 'fast' | 'slow';
   }
 ): Promise<SocraticResponse> => {
-  const { data, error } = await supabase.functions.invoke('socratic-tutor', {
-    body: {
-      action,
-      ...params
+  try {
+    console.log("Calling Socratic tutor with action:", action, "and params:", params);
+    
+    const { data, error } = await supabase.functions.invoke('socratic-tutor', {
+      body: {
+        action,
+        ...params
+      }
+    });
+
+    if (error) {
+      console.error("Error calling Socratic tutor:", error);
+      return { result: "Sorry, I encountered an error. Please try again.", error: error.message };
     }
-  });
 
-  if (error) {
-    console.error("Error calling Socratic tutor:", error);
-    throw new Error(`Error calling Socratic tutor: ${error.message}`);
+    return data || { result: "Sorry, I received an empty response. Please try again." };
+  } catch (error) {
+    console.error("Error in callSocraticTutor:", error);
+    return { 
+      result: "Sorry, I encountered a technical issue. Please try again.", 
+      error: error instanceof Error ? error.message : String(error) 
+    };
   }
-
-  return data;
 };
 
 // Gamification functions

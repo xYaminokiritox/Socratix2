@@ -1,10 +1,9 @@
-
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
-import { MessageSquare, Send, Loader2 } from "lucide-react";
-import { ConversationMessage, addMessage, callSocraticTutor, updateSessionEvaluation } from "@/services/socraticService";
+import { MessageSquare, Send, Loader2, RefreshCw } from "lucide-react";
+import { ConversationMessage, addMessage, callSocraticTutor, getSessionMessages, updateSessionEvaluation } from "@/services/socraticService";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -34,6 +33,7 @@ const ChatInterface = ({
   const [isLoading, setIsLoading] = useState(false);
   const [userLevel, setUserLevel] = useState<'beginner' | 'intermediate' | 'advanced'>('beginner');
   const [responseTiming, setResponseTiming] = useState<'normal' | 'fast' | 'slow'>('normal');
+  const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
   // Scroll to bottom of messages
@@ -47,15 +47,46 @@ const ChatInterface = ({
       startConversation();
     }
   }, [sessionId, topic, messages.length]);
+
+  // Load existing messages if session already exists
+  useEffect(() => {
+    const loadExistingMessages = async () => {
+      if (sessionId && initialMessages.length === 0) {
+        try {
+          const existingMessages = await getSessionMessages(sessionId);
+          if (existingMessages && existingMessages.length > 0) {
+            setMessages(existingMessages);
+          } else if (messages.length === 0) {
+            // If no existing messages, start a new conversation
+            startConversation();
+          }
+        } catch (err) {
+          console.error("Error loading messages:", err);
+        }
+      }
+    };
+
+    loadExistingMessages();
+  }, [sessionId, initialMessages.length]);
   
   const startConversation = async () => {
     if (!sessionId || !topic) return;
     
     setIsLoading(true);
+    setError(null);
     try {
+      console.log("Starting conversation for topic:", topic);
+      
       // Get first question from AI
       const response = await callSocraticTutor('start', { topic });
+      
+      if (response.error) {
+        throw new Error(response.error);
+      }
+      
       if (typeof response.result === 'string') {
+        console.log("Received first question from AI:", response.result);
+        
         // Add AI's first question to the conversation
         const aiMessage = await addMessage(
           sessionId,
@@ -68,11 +99,16 @@ const ChatInterface = ({
         // Update local messages state if we got a valid response
         if (aiMessage) {
           setMessages([aiMessage]);
+        } else {
+          throw new Error("Failed to save AI message");
         }
+      } else {
+        throw new Error("Unexpected response format");
       }
     } catch (error) {
       console.error("Error starting conversation:", error);
-      toast.error("Failed to start the conversation");
+      setError(error instanceof Error ? error.message : "Failed to start the conversation");
+      toast.error("Failed to start the conversation. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -84,6 +120,7 @@ const ChatInterface = ({
     const userMessage = input.trim();
     setInput("");
     setIsLoading(true);
+    setError(null);
     
     const startTime = Date.now();
     
@@ -91,6 +128,8 @@ const ChatInterface = ({
       // Calculate the next sequence numbers
       const nextUserSeq = messages.length + 1;
       const nextAiSeq = nextUserSeq + 1;
+      
+      console.log("Saving user message with sequence:", nextUserSeq);
       
       // Save user's response to the database
       const savedUserMsg = await addMessage(
@@ -120,8 +159,12 @@ const ChatInterface = ({
       const userMessagesCount = updatedMessages.filter(msg => msg.sender === 'user').length;
       const shouldEvaluate = userMessagesCount >= 5;
       
+      console.log(`User message count: ${userMessagesCount}, Should evaluate: ${shouldEvaluate}`);
+      
       if (shouldEvaluate) {
         // Call AI to evaluate the conversation
+        console.log("Evaluating conversation");
+        
         const evaluationResponse = await callSocraticTutor('evaluate', {
           topic,
           conversationHistory,
@@ -129,7 +172,13 @@ const ChatInterface = ({
           responseTiming
         });
         
+        if (evaluationResponse.error) {
+          throw new Error(evaluationResponse.error);
+        }
+        
         if (typeof evaluationResponse.result !== 'string') {
+          console.log("Received evaluation:", evaluationResponse.result);
+          
           // Save evaluation results
           await updateSessionEvaluation(
             sessionId,
@@ -149,6 +198,8 @@ const ChatInterface = ({
           
           if (evalMessage) {
             setMessages([...updatedMessages, evalMessage]);
+          } else {
+            throw new Error("Failed to save evaluation message");
           }
           
           // Call the callback if provided
@@ -157,9 +208,13 @@ const ChatInterface = ({
           }
           
           toast.success("Learning session completed!");
+        } else {
+          throw new Error("Invalid evaluation response format");
         }
       } else {
         // Continue the conversation with next AI question
+        console.log("Continuing conversation");
+        
         const response = await callSocraticTutor('continue', {
           userResponse: userMessage,
           conversationHistory,
@@ -167,7 +222,13 @@ const ChatInterface = ({
           responseTiming
         });
         
+        if (response.error) {
+          throw new Error(response.error);
+        }
+        
         if (typeof response.result === 'string') {
+          console.log("Received AI response:", response.result);
+          
           // Parse the response - looking for feedback and question sections
           let feedbackContent = "";
           let questionContent = response.result;
@@ -179,6 +240,9 @@ const ChatInterface = ({
             // We have both feedback and question sections
             feedbackContent = feedbackMatch[1].trim();
             questionContent = questionMatch[1].trim();
+            
+            console.log("Adding feedback:", feedbackContent);
+            console.log("Adding question:", questionContent);
             
             // Add feedback message
             const feedbackMessage = await addMessage(
@@ -201,9 +265,13 @@ const ChatInterface = ({
             // Update local messages state with AI's feedback and next question
             if (feedbackMessage && questionMessage) {
               setMessages([...updatedMessages, feedbackMessage, questionMessage]);
+            } else {
+              throw new Error("Failed to save AI feedback or question");
             }
           } else {
             // If the response doesn't follow the expected format, just use it as-is
+            console.log("Adding AI response (no feedback/question format)");
+            
             const aiMessage = await addMessage(
               sessionId,
               response.result,
@@ -215,13 +283,18 @@ const ChatInterface = ({
             // Update local messages state with AI's response
             if (aiMessage) {
               setMessages([...updatedMessages, aiMessage]);
+            } else {
+              throw new Error("Failed to save AI message");
             }
           }
+        } else {
+          throw new Error("Invalid response format");
         }
       }
     } catch (error) {
       console.error("Error in conversation:", error);
-      toast.error("Failed to process your response");
+      setError(error instanceof Error ? error.message : "Failed to process your response");
+      toast.error("Failed to process your response. Please try again.");
     } finally {
       setIsLoading(false);
       
@@ -282,6 +355,19 @@ const ChatInterface = ({
     console.log(`Response timing: ${newTiming} (${responseTimeSeconds.toFixed(1)}s)`);
   };
   
+  const handleRetry = () => {
+    if (messages.length === 0) {
+      startConversation();
+    } else {
+      // Get last user message and try again
+      const lastUserMessage = [...messages].reverse().find(m => m.sender === 'user');
+      if (lastUserMessage && lastUserMessage.content) {
+        setInput(lastUserMessage.content);
+      }
+      setError(null);
+    }
+  };
+  
   return (
     <Card className="h-[600px] flex flex-col">
       <CardHeader>
@@ -299,10 +385,27 @@ const ChatInterface = ({
       </CardHeader>
       
       <CardContent className="flex-1 overflow-y-auto mb-4 space-y-4 px-4">
-        {messages.length === 0 && !isLoading && (
+        {messages.length === 0 && !isLoading && !error && (
           <div className="h-full flex flex-col items-center justify-center text-muted-foreground">
             <MessageSquare className="h-10 w-10 mb-2 opacity-50" />
             <p>Start your learning journey with Socratic questioning</p>
+          </div>
+        )}
+        
+        {error && (
+          <div className="flex justify-center my-4">
+            <div className="bg-destructive/10 text-destructive rounded-lg p-3 max-w-[80%]">
+              <p className="text-sm">{error}</p>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="mt-2 w-full"
+                onClick={handleRetry}
+              >
+                <RefreshCw className="h-3 w-3 mr-2" />
+                Retry
+              </Button>
+            </div>
           </div>
         )}
         

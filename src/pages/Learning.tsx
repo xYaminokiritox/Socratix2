@@ -4,7 +4,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, Brain, BookOpen, ArrowUp, Timer } from "lucide-react";
+import { Loader2, Brain, BookOpen, ArrowUp, Timer, AlertCircle } from "lucide-react";
 import Header from "@/components/Header";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
@@ -37,6 +37,7 @@ const Learning = () => {
   } | null>(null);
   const [showChallengeMode, setShowChallengeMode] = useState(false);
   const [learningProgress, setLearningProgress] = useState(0);
+  const [error, setError] = useState<string | null>(null);
 
   // Load existing session if sessionId is provided
   useEffect(() => {
@@ -45,8 +46,17 @@ const Learning = () => {
     }
   }, [activeSession]);
 
+  // Check if the user is authenticated
+  useEffect(() => {
+    if (!session) {
+      toast.error("Please sign in to access learning sessions");
+      navigate("/auth");
+    }
+  }, [session, navigate]);
+
   const loadSession = async (sessionId: string) => {
     setIsLoading(true);
+    setError(null);
     try {
       const sessionData = await getSession(sessionId);
       if (sessionData) {
@@ -77,11 +87,13 @@ const Learning = () => {
           setLearningProgress(30); // Default progress for ongoing sessions
         }
       } else {
+        setError("Session not found");
         toast.error("Session not found");
         navigate("/sessions");
       }
     } catch (error) {
       console.error("Error loading session:", error);
+      setError(error instanceof Error ? error.message : "Failed to load learning session");
       toast.error("Failed to load learning session");
     } finally {
       setIsLoading(false);
@@ -95,13 +107,15 @@ const Learning = () => {
     }
 
     setIsLoading(true);
+    setError(null);
     try {
       // Create a new session in the database
       const newSession = await createSession(topic);
       if (!newSession) {
-        toast.error("Failed to create learning session");
-        return;
+        throw new Error("Failed to create learning session");
       }
+
+      console.log("Created new session:", newSession);
 
       // Generate initial summary for new topic
       setSummarizedNotes(
@@ -119,9 +133,13 @@ const Learning = () => {
       
       // Start with initial progress
       setLearningProgress(5);
+      
+      // Update the URL to include the session ID without reloading the page
+      navigate(`/learning/${newSession.id}`, { replace: true });
     } catch (error) {
       console.error("Error starting session:", error);
-      toast.error("Failed to start learning session");
+      setError(error instanceof Error ? error.message : "Failed to start learning session");
+      toast.error("Failed to start learning session. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -192,6 +210,12 @@ const Learning = () => {
                     className="w-full"
                   />
                 </div>
+                {error && (
+                  <div className="p-3 bg-destructive/10 text-destructive rounded-md flex items-start gap-2">
+                    <AlertCircle className="h-5 w-5 flex-shrink-0 mt-0.5" />
+                    <p className="text-sm">{error}</p>
+                  </div>
+                )}
               </div>
             </CardContent>
             <CardFooter>
